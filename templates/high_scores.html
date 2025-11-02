@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pcherské Legendy - Skóre</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 20px auto; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        .rank-1 { background-color: gold; }
+        .rank-2 { background-color: silver; }
+        .rank-3 { background-color: #cd7f32; }
+    </style>
+</head>
+<body>
+    <h2>Skóre</h2>
+    <table id="highscoresTable">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Character</th>
+                <th>Player</th>
+                <th>Level</th>
+                <th>Gold</th>
+            </tr>
+        </thead>
+        <tbody id="highscoresBody"></tbody>
+    </table>
+    
+    <div>
+        <a href="/login">Přihlásit Se</a> | 
+        <a href="/register">Vytvořit Účet</a>
+    </div>
+
+    <script>
+        async function loadHighscores() {
+            const response = await fetch('/api/highscores');
+            const data = await response.json();
+            
+            const highscoresBody = document.getElementById('highscoresBody');
+            highscoresBody.innerHTML = '';
+            
+            data.highscores.forEach((score, index) => {
+                const row = document.createElement('tr');
+                if (index < 3) row.className = `rank-${index + 1}`;
+                
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${score.character_name}</td>
+                    <td>${score.username}</td>
+                    <td>${score.level}</td>
+                    <td>${score.gold}</td>
+                `;
+                highscoresBody.appendChild(row);
+            });
+        }
+        
+        loadHighscores();
+    </script>
+</body>
+</html>

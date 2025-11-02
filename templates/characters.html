@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pcherské Legendy - Postavy</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 20px auto; padding: 20px; }
+        .character-card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .character-stats { color: #666; font-size: 14px; }
+        button { padding: 8px 15px; margin: 5px; }
+        .new-character { margin: 20px 0; }
+        input { padding: 8px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h2>Postavy</h2>
+    <div id="charactersList"></div>
+    
+    <div class="new-character">
+        <h3>Vytvořit Novou Postavu</h3>
+        <input type="text" id="characterName" placeholder="Jméno Postavy">
+        <button onclick="createCharacter()">Vytvořit Postavu</button>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <a href="/highscores">Zobrazit Skóre</a> | 
+        <a href="/login" onclick="logout()">Odhlásit Se</a>
+    </div>
+
+    <script>
+        const userId = localStorage.getItem('user_id');
+        const username = localStorage.getItem('username');
+        
+        if (!userId) {
+            window.location.href = '/login';
+        }
+        
+        document.title = `RPG Game - ${username}'s Characters`;
+        
+        async function loadCharacters() {
+            const response = await fetch(`/api/characters?user_id=${userId}`);
+            const data = await response.json();
+            
+            const charactersList = document.getElementById('charactersList');
+            charactersList.innerHTML = '';
+            
+            if (data.characters.length === 0) {
+                charactersList.innerHTML = '<p>No characters yet. Create your first character!</p>';
+                return;
+            }
+            
+            data.characters.forEach(character => {
+                const card = document.createElement('div');
+                card.className = 'character-card';
+                card.innerHTML = `
+                    <h3>${character.name}</h3>
+                    <div class="character-stats">
+                        Level: ${character.level} | Gold: ${character.gold} | 
+                        Attack: ${character.attack} | Defense: ${character.defense}
+                    </div>
+                    <button onclick="playGame(${character.id})">Play Game</button>
+                    <button onclick="deleteCharacter(${character.id})">Delete</button>
+                `;
+                charactersList.appendChild(card);
+            });
+        }
+        
+        async function createCharacter() {
+            const name = document.getElementById('characterName').value.trim();
+            if (!name) return alert('Please enter a character name');
+            
+            const response = await fetch('/api/characters', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: name,
+                    user_id: parseInt(userId)
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('characterName').value = '';
+                loadCharacters();
+            }
+        }
+        
+        function playGame(characterId) {
+            localStorage.setItem('current_character_id', characterId);
+            alert('Launch the PyQt6 game client to play with this character!');
+        }
+        
+        function logout() {
+            localStorage.clear();
+        }
+        
+        loadCharacters();
+    </script>
+</body>
+</html>

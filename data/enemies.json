@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "description": "Enemies grouped by dungeon level. Fill stats per enemy.",
+  "levels": {
+    "1": [
+      {
+        "id": "sewers-en-1",
+        "name": "Giant rat",
+        "type": "normal",
+        "health": 10,
+        "attack": 3,
+        "defense": 1,
+        "reward_gold": 4,
+        "reward_exp": 3
+      },
+      {
+	"id": "sewers-en-2",
+        "name": "Sewer slime",
+        "type": "normal",
+        "health": 12,
+        "attack": 5,
+        "defense": 2,
+        "reward_gold": 6,
+        "reward_exp": 4
+      },
+      {
+	"id": "sewers-en-3",
+        "name": "Toxic snail",
+        "type": "normal",
+        "health": 14,
+        "attack": 1,
+        "defense": 5,
+        "reward_gold": 5,
+        "reward_exp": 5
+      },
+      {
+	"id": "sewers-en-4",
+        "name": "Drowned",
+        "type": "normal",
+        "health": 20,
+        "attack": 8,
+        "defense": 3,
+        "reward_gold": 14,
+        "reward_exp": 10
+      }
+    ],
+    "boss": {
+      "1": {
+        "id": "sewers-boss",
+        "name": "Rat king",
+        "type": "boss",
+        "health": 120,
+        "attack": 14,
+        "defense": 6,
+        "reward_gold": 50,
+        "reward_exp": 40
+      }
+    }
+  }
+}

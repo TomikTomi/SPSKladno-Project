@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "description": "Narrative events by level. Choices apply simple effects.",
+  "levels": {
+    "1": [
+      {
+        "id": "example-ancient-altar",
+        "title": "Ancient Altar",
+        "description": "You find an ancient altar covered in dust.",
+        "rarity": 1,
+        "choices": [
+          {
+            "id": "clean",
+            "label": "Clean the altar",
+            "effects": { "gold": 5, "health": 0, "potions": 0 }
+          },
+          {
+            "id": "pray",
+            "label": "Say a prayer",
+            "effects": { "gold": 0, "health": 5, "potions": 0 }
+          }
+        ]
+      },
+      {
+        "id": "lost-backpack",
+        "title": "Lost Backpack",
+        "description": "You find a dusty old backpack lying in the corner.",
+        "rarity": 1,
+        "choices": [
+          {
+            "id": "open",
+            "label": "Open the backpack",
+            "effects": { "gold": 20, "health": 0, "potions": 1 }
+          },
+          {
+            "id": "leave",
+            "label": "Leave it alone",
+            "effects": { "gold": 0, "health": 0, "potions": 0 }
+          }
+        ]
+      }
+    ]
+  }
+}
