@@ -12,7 +12,7 @@ Jednoduchý RPG projekt (Flask + PyQt6 + Pygame).
 - Otevři PowerShell v kořeni projektu.
 - Vytvoř a aktivuj virtuální prostředí, nainstaluj závislosti:
   - `python -m venv venv`
-  - `.\n+venv\Scripts\Activate.ps1`
+  - `.\venv\Scripts\Activate.ps1`
   - `pip install -r requirements.txt`
 - Spusť aplikaci:
   - `python launcher.py`
