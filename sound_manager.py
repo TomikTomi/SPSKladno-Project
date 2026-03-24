@@ -12,6 +12,7 @@ class SoundManager:
         # Dictionary to store loaded sounds
         self.sounds = {}
         self.music_playing = False
+        self.effects_volume = 0.7
         
         # Create sounds directory if it doesn't exist
         if not os.path.exists('sounds'):
@@ -32,6 +33,11 @@ class SoundManager:
             try:
                 sound_path = os.path.join('sounds', filename)
                 self.sounds[name] = pygame.mixer.Sound(sound_path)
+                # Apply current effects volume to the newly loaded sound
+                try:
+                    self.sounds[name].set_volume(self.effects_volume)
+                except Exception:
+                    pass
                 return True
             except pygame.error:
                 print(f"Could not load sound file: {filename}")
@@ -77,6 +83,15 @@ class SoundManager:
         """Set the volume of a specific sound effect (0.0 to 1.0)"""
         if name in self.sounds:
             self.sounds[name].set_volume(volume)
+
+    def set_effects_volume(self, volume):
+        """Set the global effects volume and apply to all loaded sounds"""
+        self.effects_volume = max(0.0, min(1.0, float(volume)))
+        for snd in self.sounds.values():
+            try:
+                snd.set_volume(self.effects_volume)
+            except Exception:
+                pass
             
     def create_shop_sounds(self):
         """Create shop-specific sound files if they don't exist"""

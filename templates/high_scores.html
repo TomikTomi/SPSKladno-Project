@@ -2,19 +2,22 @@
 <html>
 <head>
     <title>Pcherské Legendy - Skóre</title>
-    <style>
-        body { font-family: Arial; max-width: 600px; margin: 20px auto; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #f2f2f2; }
-        .rank-1 { background-color: gold; }
-        .rank-2 { background-color: silver; }
-        .rank-3 { background-color: #cd7f32; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    <nav class="top-bar">
+        <div class="nav-container">
+            <a href="/" class="nav-link">Přihlášení</a>
+            <a href="/register" class="nav-link">Registrace</a>
+            <a href="/characters" class="nav-link">Postavy</a>
+            <a href="/highscores" class="nav-link active">Žebříček</a>
+            <a href="/manual" class="nav-link">Manuál</a>
+            <a href="/diagramy" class="nav-link">Diagramy</a>
+        </div>
+    </nav>
+    <div class="container">
     <h2>Skóre</h2>
-    <table id="highscoresTable">
+    <table id="highscoresTable" class="table">
         <thead>
             <tr>
                 <th>Rank</th>
@@ -22,14 +25,17 @@
                 <th>Player</th>
                 <th>Level</th>
                 <th>Gold</th>
+                <th>Score</th>
             </tr>
         </thead>
         <tbody id="highscoresBody"></tbody>
     </table>
     
-    <div>
+    <div class="links">
         <a href="/login">Přihlásit Se</a> | 
         <a href="/register">Vytvořit Účet</a>
+    </div>
+
     </div>
 
     <script>
@@ -50,6 +56,7 @@
                     <td>${score.username}</td>
                     <td>${score.level}</td>
                     <td>${score.gold}</td>
+                    <td>${score.score}</td>
                 `;
                 highscoresBody.appendChild(row);
             });

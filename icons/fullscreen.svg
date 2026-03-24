@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <!-- Fullscreen Corners -->
+    <path d="M12 24 L12 12 L24 12" fill="none" stroke="#4f7cff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M40 12 L52 12 L52 24" fill="none" stroke="#4f7cff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M52 40 L52 52 L40 52" fill="none" stroke="#4f7cff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M24 52 L12 52 L12 40" fill="none" stroke="#4f7cff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

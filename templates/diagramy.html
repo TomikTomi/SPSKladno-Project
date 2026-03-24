@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pcherské Legendy - Diagramy</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Načtení Mermaid.js pro vykreslení diagramu -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            securityLevel: 'loose',
+            flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }
+        });
+    </script>
+    <style>
+        .diagram-container {
+            background: #1b2138;
+            padding: 30px;
+            border-radius: 12px;
+            margin-top: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            overflow-x: auto;
+        }
+        .mermaid {
+            background: transparent;
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-bar">
+        <div class="nav-container">
+            <a href="/" class="nav-link">Přihlášení</a>
+            <a href="/register" class="nav-link">Registrace</a>
+            <a href="/characters" class="nav-link">Postavy</a>
+            <a href="/highscores" class="nav-link">Žebříček</a>
+            <a href="/manual" class="nav-link">Manuál</a>
+            <a href="/diagramy" class="nav-link active">Diagramy</a>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 1000px;">
+        <h1>Databázové Schéma</h1>
+        <p>Tento diagram znázorňuje strukturu entit a jejich vztahů v naší hře (Chenova notace).</p>
+        
+        <div class="diagram-container">
+            <div class="mermaid">
+graph TD
+    %% Entity (Obdélníky)
+    U[Uživatel / User]
+    C[Postava / Character]
+
+    %% Vztahy (Kosočtverce)
+    R{vlastní}
+
+    %% Atributy Uživatele (Ovály)
+    U_id((<u>u-id</u>))
+    U_name((username))
+    U_pass((password_hash))
+
+    %% Atributy Postavy (Ovály)
+    C_id((<u>c-id</u>))
+    C_name((name))
+    C_lvl((level))
+    C_exp((exp))
+    C_hp((health))
+    C_mhp((max_health))
+    C_atk((attack))
+    C_def((defense))
+    C_gold((gold))
+    C_pot((potions))
+    C_score((score))
+
+    %% Propojení Uživatele
+    U --- U_id
+    U --- U_name
+    U --- U_pass
+
+    %% Propojení Postavy
+    C --- C_id
+    C --- C_name
+    C --- C_lvl
+    C --- C_exp
+    C --- C_hp
+    C --- C_mhp
+    C --- C_atk
+    C --- C_def
+    C --- C_gold
+    C --- C_pot
+    C --- C_score
+
+    %% Propojení Vztahu (1:N)
+    U -- 1 --- R
+    R -- M --- C
+
+    %% Stylování (pro webový vzhled)
+    style U fill:#4f7cff,stroke:#fff,stroke-width:2px,color:#fff
+    style C fill:#4f7cff,stroke:#fff,stroke-width:2px,color:#fff
+    style R fill:#f2994a,stroke:#fff,stroke-width:1px,color:#fff
+    style U_id fill:#2a315a,stroke:#4f7cff,color:#fff
+    style U_name fill:#2a315a,stroke:#4f7cff,color:#fff
+    style U_pass fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_id fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_name fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_lvl fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_exp fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_hp fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_mhp fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_atk fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_def fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_gold fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_pot fill:#2a315a,stroke:#4f7cff,color:#fff
+    style C_score fill:#2a315a,stroke:#4f7cff,color:#fff
+            </div>
+        </div>
+
+        <div class="links" style="margin-top: 30px;">
+            <a href="/manual">Zpět do Manuálu</a>
+        </div>
+    </div>
+</body>
+</html>

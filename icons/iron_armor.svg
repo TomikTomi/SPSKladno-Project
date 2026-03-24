@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+    <!-- Iron Plate Armor -->
+    <path d="M16 12 L24 8 L40 8 L48 12 L52 24 L48 48 L16 48 L12 24 Z" fill="#B0BEC5" stroke="#37474F" stroke-width="2"/>
+    <path d="M16 24 L48 24 M16 36 L48 36" stroke="#78909C" stroke-width="1"/>
+</svg>

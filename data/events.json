@@ -12,12 +12,12 @@
           {
             "id": "clean",
             "label": "Clean the altar",
-            "effects": { "gold": 5, "health": 0, "potions": 0 }
+            "effects": { "gold": 20, "health": 0, "potions": 0 }
           },
           {
             "id": "pray",
             "label": "Say a prayer",
-            "effects": { "gold": 0, "health": 5, "potions": 0 }
+            "effects": { "gold": 0, "health": 20, "potions": 0 }
           }
         ]
       },
@@ -30,7 +30,7 @@
           {
             "id": "open",
             "label": "Open the backpack",
-            "effects": { "gold": 20, "health": 0, "potions": 1 }
+            "effects": { "gold": 35, "health": 0, "potions": 1 }
           },
           {
             "id": "leave",

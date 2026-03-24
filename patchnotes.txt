@@ -1,0 +1,44 @@
+Version 0.4 — Patch Notes
+
+Overview
+- Introduced data-driven events, improved dungeon flow, and enhanced encounters.
+- Added Level 2 content, warnings, and a peace step. Implemented unique boss music and pre-fight lore in log.
+
+Dungeon & Flow
+- Level naming: Level 2 now displays as "Goblin Hideout".
+- Entry messaging: Added entry text and a Level 2 warning (recommended level/equipment).
+- Peace layer: Implemented a one-step safe advance on entering Level 2.
+- Boss approach warnings: Added atmospheric warnings for final steps before boss.
+- Victory cleanup: After boss defeat, combat UI hides and actions refresh to prevent getting stuck.
+- Flee behavior: Confirmed flee resets dungeon state correctly.
+
+Content Loading
+- load_content reads enemies from data/enemies.json and events from data/events.json.
+- Removed Level 2 hardcoded fallbacks in client; content now comes from JSON.
+- Added Level 2 enemies to data/enemies.json (Goblin variants and Mutant).
+- Added boss mapping to data/enemies.json for levels with explicit boss entries.
+
+Events System
+- Added EventDialog to present events with choices loaded from data/events.json.
+- Choice effects apply to gold, health (clamped to max), and potions.
+- Logged outcomes to Adventure Log and refreshed stats after events.
+
+Encounters: Lore & Music
+- Enemy descriptions: Logged in Adventure Log at combat start (no popups).
+- Boss descriptions: Logged in Adventure Log at combat start.
+- Unique boss music: Each boss can specify a per-boss track via "music" in data/enemies.json; falls back to background_boss.wav.
+
+Data Schema Adjustments
+- data/enemies.json: Added "description" to enemies/bosses and optional "music" for bosses.
+
+Server & Preview
+- Verified Flask backend is reachable at http://localhost:5000/characters.
+
+Files Touched
+- rpg_client.py: load_content, explore_dungeon, advance_dungeon, start_enemy_placeholder, start_boss_battle, event handling, victory cleanup.
+- data/enemies.json: Added descriptions and boss music fields; expanded Level 2 enemies and bosses.
+- data/events.json: Retained structure; used by EventDialog.
+
+Notes
+- Background music respects the Options setting (QSettings: background_music).
+- If a boss music file is missing, the default boss theme plays.

@@ -3,37 +3,165 @@ import random
 import os
 import json
 import requests
+import wave
+import array
+import math
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel, 
-    QVBoxLayout, QHBoxLayout, QWidget, QTextEdit, QProgressBar,
-    QDialog, QLineEdit, QMessageBox, QCheckBox, QDialogButtonBox
+    QVBoxLayout, QHBoxLayout, QWidget, QTextEdit,
+    QDialog, QLineEdit, QMessageBox, QDialogButtonBox,
+    QSizePolicy, QSlider, QTabWidget, QGridLayout
 )
 from PyQt6.QtCore import Qt, QTimer, QSettings
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QTextCursor
+from PyQt6.QtSvg import QSvgRenderer
 from sound_manager import SoundManager
 
+# --- KONFIGURACE A KATALOG ---
+
+# Globální katalog všech předmětů ve hře
+ITEM_CATALOG = [
+    # Zbraně (Weapon) - zvyšují útok
+    {"name": "Rusty Dagger", "type": "weapon", "stat": "attack", "bonus": 2, "price": 20, "icon": "rusty_dagger.svg"},
+    {"name": "Iron Sword", "type": "weapon", "stat": "attack", "bonus": 5, "price": 50, "icon": "iron_sword.svg"},
+    {"name": "Steel Sword", "type": "weapon", "stat": "attack", "bonus": 8, "price": 95, "icon": "steel_sword.svg"},
+    {"name": "Knight Blade", "type": "weapon", "stat": "attack", "bonus": 12, "price": 160, "icon": "knight_blade.svg"},
+    {"name": "War Axe", "type": "weapon", "stat": "attack", "bonus": 15, "price": 220, "icon": "war_axe.svg"},
+    {"name": "Elven Longbow", "type": "weapon", "stat": "attack", "bonus": 18, "price": 280, "icon": "elven_longbow.svg"},
+    {"name": "Mythril Spear", "type": "weapon", "stat": "attack", "bonus": 22, "price": 360, "icon": "mythril_spear.svg"},
+    {"name": "Dragonfang", "type": "weapon", "stat": "attack", "bonus": 28, "price": 480, "icon": "dragonfang.svg"},
+    {"name": "Cursed Blade", "type": "weapon", "stat": "attack", "bonus": 36, "price": 880, "icon": "cursed_blade.svg"},
+    {"name": "Hammer of Justice", "type": "weapon", "stat": "attack", "bonus": 43, "price": 1200, "icon": "hammer_of_justice.svg"},
+    {"name": "Enchanted Crossbow", "type": "weapon", "stat": "attack", "bonus": 50, "price": 1650, "icon": "enchanted_crossbow.svg"},
+    
+    # Helmy (Head) - zvyšují obranu
+    {"name": "Leather Cap", "type": "head", "stat": "defense", "bonus": 1, "price": 15, "icon": "leather_cap.svg"},
+    {"name": "Iron Helmet", "type": "head", "stat": "defense", "bonus": 2, "price": 40, "icon": "iron_helmet.svg"},
+    {"name": "Steel Helmet", "type": "head", "stat": "defense", "bonus": 4, "price": 85, "icon": "steel_helmet.svg"},
+    {"name": "Knight Great Helm", "type": "head", "stat": "defense", "bonus": 6, "price": 150, "icon": "knight_great_helm.svg"},
+    {"name": "Mythril Helm", "type": "head", "stat": "defense", "bonus": 9, "price": 250, "icon": "mythril_helm.svg"},
+    
+    # Brnění (Torso) - zvyšují obranu
+    {"name": "Padded Vest", "type": "torso", "stat": "defense", "bonus": 1, "price": 25, "icon": "padded_vest.svg"},
+    {"name": "Leather Armor", "type": "torso", "stat": "defense", "bonus": 2, "price": 60, "icon": "leather_armor.svg"},
+    {"name": "Chain Mail", "type": "torso", "stat": "defense", "bonus": 4, "price": 120, "icon": "chain_mail.svg"},
+    {"name": "Scale Armor", "type": "torso", "stat": "defense", "bonus": 6, "price": 190, "icon": "scale_armor.svg"},
+    {"name": "Plate Armor", "type": "torso", "stat": "defense", "bonus": 8, "price": 270, "icon": "plate_armor.svg"},
+    {"name": "Mythril Plate", "type": "torso", "stat": "defense", "bonus": 12, "price": 420, "icon": "mythril_plate.svg"},
+    {"name": "Dragonhide Armor", "type": "torso", "stat": "defense", "bonus": 20, "price": 1620, "icon": "dragonhide_armor.svg"},
+    {"name": "Colossus Armor", "type": "torso", "stat": "defense", "bonus": 25, "price": 2130, "icon": "colossus_armor.svg"},
+    
+    # Boty (Legs) - zvyšují obranu
+    {"name": "Leather Boots", "type": "legs", "stat": "defense", "bonus": 1, "price": 20, "icon": "leather_boots.svg"},
+    {"name": "Iron Greaves", "type": "legs", "stat": "defense", "bonus": 2, "price": 45, "icon": "iron_greaves.svg"},
+    {"name": "Steel Greaves", "type": "legs", "stat": "defense", "bonus": 4, "price": 90, "icon": "steel_greaves.svg"},
+    {"name": "Plate Greaves", "type": "legs", "stat": "defense", "bonus": 6, "price": 160, "icon": "plate_greaves.svg"},
+    {"name": "Mythril Greaves", "type": "legs", "stat": "defense", "bonus": 9, "price": 280, "icon": "mythril_greaves.svg"},
+    
+    # Lektvary (Consumable)
+    {"name": "Health Potion", "type": "consumable", "stat": "potions", "bonus": 1, "price": 15, "icon": "potion.wav"}
+]
+
+# Mapa ikon pro rychlejší dohledávání v UI
+ICON_MAP = {it['name']: it['icon'] for it in ITEM_CATALOG}
+# Přidání výchozích ikon pro prázdné sloty
+ICON_MAP.update({
+    "": "empty_weapon.svg", # Default pro prázdné jméno
+    "empty_head": "empty_head.svg",
+    "empty_torso": "empty_torso.svg",
+    "empty_legs": "empty_legs.svg",
+    "empty_weapon": "empty_weapon.svg"
+})
+
+# Globální styly pro moderní tmavý vzhled aplikace (QSS)
+APP_QSS = """
+/* Stylizace hlavního okna a dialogů */
+QMainWindow, QDialog { background: #0f1220; }
+QWidget#central { background: #111527; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+
+/* Záložky v obchodě */
+QTabWidget::pane { border: 1px solid #2a315a; background: #111527; border-radius: 8px; margin-top: -1px; }
+QTabBar::tab { background: #1a1f3a; color: #9aa0b4; padding: 8px 12px; border-top-left-radius: 6px; border-top-right-radius: 6px; border: 1px solid #2a315a; border-bottom: none; margin-right: 2px; }
+QTabBar::tab:selected { background: #2a315a; color: #ffffff; font-weight: bold; }
+QTabWidget QWidget { background: #111527; }
+
+/* Textové popisky */
+QLabel { color: #e6e9f3; }
+QLabel#versionLabel { color: #9aa0b4; font-size: 10px; }
+QLabel#goldLabel { font-size: 16px; font-weight: bold; color: #ffd700; margin-bottom: 10px; }
+
+/* Vstupní pole a textové editory */
+QLineEdit { background: #171a2a; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #e6e9f3; padding: 6px 8px; }
+QTextEdit#log { background: #171a2a; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; color: #e6e9f3; font-family: 'Segoe UI', Arial; font-size: 13px; }
+
+/* Obecná tlačítka */
+QPushButton { 
+    padding: 8px 14px; 
+    border-radius: 10px; 
+    border: 1px solid rgba(255,255,255,.08); 
+    background: #2a315a; 
+    color: #e6e9f3; 
+}
+QPushButton:hover { background: #33407a; }
+QPushButton:pressed { background: #23294d; }
+
+/* Barevné varianty tlačítek pro různé akce */
+QPushButton#exploreBtn { background: #4f7cff; border-color: rgba(79,124,255,.4); }
+QPushButton#shopBtn { background: #4CAF50; }
+QPushButton#restBtn { background: #f2994a; }
+QPushButton#returnTownBtn { background: #9bb4ff; color: #0f1220; }
+QPushButton#attackBtn { background: #ef4444; }
+QPushButton#usePotionBtn { background: #22c55e; }
+QPushButton#fleeBtn { background: #a855f7; }
+QPushButton:disabled { background: #1a1f3a; color: #4a5068; border-color: #111527; }
+
+/* Malá kruhová tlačítka v záhlaví */
+QPushButton#settingsBtn, QPushButton#fullscreenBtn { 
+    font-size: 16px; 
+    background-color: #1a1f3a; 
+    border-radius: 15px; 
+    border: 1px solid #2a315a; 
+    min-width: 30px; min-height: 30px;
+    padding: 0;
+}
+
+/* Styl pro Tooltipy (popisky při najetí myší) */
+QToolTip {
+    background-color: #2a315a;
+    color: #ffffff;
+    border: 1px solid #4f7cff;
+    border-radius: 4px;
+    padding: 4px;
+    font-weight: bold;
+}
+"""
+
 class LoginDialog(QDialog):
+    """
+    Dialogové okno pro přihlášení uživatele.
+    Zajišťuje komunikaci se serverem a ověření identity.
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("RPG Game - Login")
-        self.resize(350, 250)
+        self.setWindowTitle("Pcherské Legendy - Přihlášení")
+        self.setFixedSize(350, 250)
         
         layout = QVBoxLayout()
         
-        # Connection status
-        self.connection_label = QLabel("Checking server connection...")
+        # Stav připojení k API serveru
+        self.connection_label = QLabel("Kontrola připojení k serveru...")
         self.connection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Username")
+        self.username_input.setPlaceholderText("Uživatelské jméno")
         
         self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Password")
+        self.password_input.setPlaceholderText("Heslo")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         
-        self.login_button = QPushButton("Login")
-        self.register_button = QPushButton("Register")
-        self.retry_button = QPushButton("Retry Connection")
+        self.login_button = QPushButton("Přihlásit se")
+        self.register_button = QPushButton("Registrovat")
+        self.retry_button = QPushButton("Zkusit znovu")
         
         layout.addWidget(self.connection_label)
         layout.addWidget(self.username_input)
@@ -44,1221 +172,994 @@ class LoginDialog(QDialog):
         
         self.setLayout(layout)
         
+        # Propojení signálů a slotů
         self.login_button.clicked.connect(self.login)
         self.register_button.clicked.connect(self.register)
         self.retry_button.clicked.connect(self.check_connection)
         
-        # Check connection on startup
         self.check_connection()
     
     def check_connection(self):
-        """Check and display connection status"""
-        self.connection_label.setText("Checking server connection...")
-        
+        """Ověří dostupnost API serveru a podle toho povolí/zakáže tlačítka."""
+        self.connection_label.setText("Kontrola připojení...")
         if self.test_connection():
-            self.connection_label.setText("✅ Connected to server")
-            self.connection_label.setStyleSheet("color: green;")
+            self.connection_label.setText("✅ Připojeno k serveru")
+            self.connection_label.setStyleSheet("color: #22c55e;")
             self.login_button.setEnabled(True)
             self.register_button.setEnabled(True)
         else:
-            self.connection_label.setText("❌ Cannot connect to server")
-            self.connection_label.setStyleSheet("color: red;")
+            self.connection_label.setText("❌ Nelze se připojit k serveru")
+            self.connection_label.setStyleSheet("color: #ef4444;")
             self.login_button.setEnabled(False)
             self.register_button.setEnabled(False)
     
     def test_connection(self):
-        """Test connection to Flask server"""
+        """Pokusí se o základní GET požadavek na API."""
         try:
-            response = requests.get('http://127.0.0.1:5000/api/highscores', timeout=5)
-            return response.status_code == 200
+            return requests.get('http://127.0.0.1:5000/api/highscores', timeout=3).status_code == 200
         except:
             return False
     
     def login(self):
-        if not self.test_connection():
-            self.check_connection()
-            return
-        
-        username = self.username_input.text()
-        password = self.password_input.text()
-        
+        """Odešle přihlašovací údaje na server."""
+        username, password = self.username_input.text(), self.password_input.text()
         if not username or not password:
-            QMessageBox.warning(self, "Error", "Please enter username and password")
+            QMessageBox.warning(self, "Chyba", "Vyplňte všechna pole.")
             return
         
         try:
-            response = requests.post(
-                'http://127.0.0.1:5000/api/login', 
-                json={'username': username, 'password': password},
-                timeout=10
-            )
-            
-            if response.json().get('success'):
-                self.user_data = response.json()
+            res = requests.post('http://127.0.0.1:5000/api/login', json={'username': username, 'password': password}, timeout=5)
+            data = res.json()
+            if data.get('success'):
+                self.user_data = data
                 self.accept()
             else:
-                QMessageBox.warning(self, "Error", "Invalid credentials")
-                
-        except requests.exceptions.ConnectionError:
-            QMessageBox.critical(self, "Connection Error", "Lost connection to server")
-            self.check_connection()
+                QMessageBox.warning(self, "Chyba", data.get('message', "Neplatné údaje."))
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Login failed: {str(e)}")
+            QMessageBox.critical(self, "Chyba", f"Server neodpovídá: {e}")
     
     def register(self):
-        # Similar robust implementation for register
-        pass
-class OptionsDialog(QDialog):
+        """Otevře dialog pro registraci nového účtu."""
+        if RegisterDialog(self).exec() == QDialog.DialogCode.Accepted:
+            QMessageBox.information(self, "Registrace", "Účet vytvořen! Nyní se můžete přihlásit.")
+
+class RegisterDialog(QDialog):
+    """
+    Dialog pro registraci nového uživatelského účtu.
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Game Options")
-        self.settings = QSettings("DungeonExplorer", "RPGGame")
-        self.setup_ui()
+        self.setWindowTitle("Registrace")
+        self.setFixedSize(320, 220)
         
-    def setup_ui(self):
         layout = QVBoxLayout()
+        self.username_input = QLineEdit(); self.username_input.setPlaceholderText("Uživatelské jméno")
+        self.password_input = QLineEdit(); self.password_input.setPlaceholderText("Heslo")
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         
-        # Title
-        title = QLabel("Game Options")
-        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        self.status_label = QLabel(""); self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Sound effects option
-        self.sound_effects_checkbox = QCheckBox("Enable Sound Effects")
-        self.sound_effects_checkbox.setChecked(self.settings.value("sound_effects", False, type=bool))
-        layout.addWidget(self.sound_effects_checkbox)
+        create_btn = QPushButton("Vytvořit účet")
+        cancel_btn = QPushButton("Zrušit")
+        create_btn.clicked.connect(self.create_account)
+        cancel_btn.clicked.connect(self.reject)
         
-        # Background music option
-        self.music_checkbox = QCheckBox("Enable Background Music")
-        self.music_checkbox.setChecked(self.settings.value("background_music", False, type=bool))
-        layout.addWidget(self.music_checkbox)
-        
-        # Add some spacing
-        layout.addSpacing(10)
-        
-        # Dialog buttons
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        button_box.accepted.connect(self.save_settings)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
-        
+        layout.addWidget(QLabel("Nová registrace"))
+        layout.addWidget(self.username_input)
+        layout.addWidget(self.password_input)
+        layout.addWidget(self.status_label)
+        layout.addWidget(create_btn)
+        layout.addWidget(cancel_btn)
         self.setLayout(layout)
+
+    def create_account(self):
+        """Odesílá registrační data na server."""
+        u, p = self.username_input.text().strip(), self.password_input.text().strip()
+        if not u or not p: return
+        try:
+            res = requests.post('http://127.0.0.1:5000/api/register', json={'username': u, 'password': p}, timeout=5).json()
+            if res.get('success'): self.accept()
+            else: self.status_label.setText(res.get('message', 'Chyba')); self.status_label.setStyleSheet("color: #ef4444;")
+        except: self.status_label.setText("Chyba serveru"); self.status_label.setStyleSheet("color: #ef4444;")
+
+class OptionsDialog(QDialog):
+    """
+    Dialog pro nastavení zvuků a hudby.
+    Ukládá preference do QSettings.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Nastavení")
+        self.settings = QSettings("DungeonExplorer", "RPGGame")
+        self.resize(400, 200)
         
-    def save_settings(self):
-        # Save settings
-        self.settings.setValue("sound_effects", self.sound_effects_checkbox.isChecked())
-        self.settings.setValue("background_music", self.music_checkbox.isChecked())
+        layout = QVBoxLayout()
+        # Nastavení hudby
+        m_lay = QHBoxLayout(); m_lay.addWidget(QLabel("Hudba:"))
+        self.m_slider = QSlider(Qt.Orientation.Horizontal); self.m_slider.setRange(0, 100)
+        self.m_slider.setValue(self.settings.value("music_volume", 50, type=int))
+        m_lay.addWidget(self.m_slider); layout.addLayout(m_lay)
+
+        # Nastavení efektů
+        e_lay = QHBoxLayout(); e_lay.addWidget(QLabel("Efekty:"))
+        self.e_slider = QSlider(Qt.Orientation.Horizontal); self.e_slider.setRange(0, 100)
+        self.e_slider.setValue(self.settings.value("effects_volume", 50, type=int))
+        e_lay.addWidget(self.e_slider); layout.addLayout(e_lay)
+
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(self.save); btns.rejected.connect(self.reject)
+        layout.addWidget(btns); self.setLayout(layout)
+        
+    def save(self):
+        """Uloží zvolené hodnoty do QSettings."""
+        self.settings.setValue("music_volume", self.m_slider.value())
+        self.settings.setValue("effects_volume", self.e_slider.value())
         self.accept()
         
+class EventDialog(QDialog):
+    """
+    Zobrazuje náhodnou událost v dungeonu a umožňuje hráči volbu.
+    """
+    def __init__(self, event_data, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(event_data.get("title", "Událost"))
+        self.resize(400, 250); self.event = event_data; self.selected_choice = None
+        
+        layout = QVBoxLayout()
+        title = QLabel(self.event.get("title", "Něco se děje..."))
+        title.setFont(QFont("Arial", 12, QFont.Weight.Bold)); layout.addWidget(title)
+
+        desc = QLabel(self.event.get("description", "")); desc.setWordWrap(True); layout.addWidget(desc)
+
+        for choice in self.event.get("choices", []):
+            btn = QPushButton(choice.get("label", "Pokračovat"))
+            btn.clicked.connect(lambda _, c=choice: self._select(c))
+            layout.addWidget(btn)
+
+        self.setLayout(layout)
+
+    def _select(self, choice):
+        self.selected_choice = choice; self.accept()
+
 class ShopDialog(QDialog):
+    """
+    Městský obchod s vybavením a lektvary.
+    Používá globální ITEM_CATALOG pro zobrazení předmětů.
+    """
     def __init__(self, character, sound_manager, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Town Shop")
-        self.resize(500, 400)
-        self.character = character
-        self.sound_manager = sound_manager
-        self.purchased_items = []
+        self.setWindowTitle("Obchod")
+        self.resize(600, 500)
+        self.character, self.sound_manager = character, sound_manager
         self.settings = QSettings("DungeonExplorer", "RPGGame")
-        
-        # Shop items with their stats and prices
-        self.shop_items = [
-            {"name": "Iron Sword", "type": "weapon", "stat": "attack", "bonus": 5, "price": 50},
-            {"name": "Steel Sword", "type": "weapon", "stat": "attack", "bonus": 10, "price": 120},
-            {"name": "Leather Armor", "type": "armor", "stat": "defense", "bonus": 3, "price": 40},
-            {"name": "Chain Mail", "type": "armor", "stat": "defense", "bonus": 7, "price": 100},
-            {"name": "Health Potion", "type": "consumable", "stat": "potions", "bonus": 1, "price": 15}
-        ]
-        
-        # Play shop music (ensure no overlap)
-        self.sound_manager.stop_music()
-        self.sound_manager.play_music("background_shop.wav", 
-                                     self.settings.value("background_music", False, type=bool))
-        
+        self.char_id = str(self.character.get('id', '0'))
+
+        # Načtení dat o vlastnictví a vybavení
+        self._load_player_data()
         self.setup_ui()
         
+        # Hudba v obchodě
+        self.sound_manager.stop_music()
+        if self.settings.value("music_volume", 50, type=int) > 0:
+            self.sound_manager.play_music("background_shop.wav", True)
+
+    def _load_player_data(self):
+        """Načte seznamy vlastněných předmětů a aktuální vybavení."""
+        def load_l(k): return json.loads(self.settings.value(f"{k}_{self.char_id}", "[]", type=str))
+        self.owned = {
+            'weapon': load_l("owned_weapons"), 'head': load_l("owned_heads"),
+            'torso': load_l("owned_torsos"), 'legs': load_l("owned_legs")
+        }
+        self.equipped = {
+            'weapon': self.settings.value(f"equipped_weapon_{self.char_id}", "", type=str),
+            'head': self.settings.value(f"equipped_head_{self.char_id}", "", type=str),
+            'torso': self.settings.value(f"equipped_torso_{self.char_id}", "", type=str),
+            'legs': self.settings.value(f"equipped_legs_{self.char_id}", "", type=str)
+        }
+
     def setup_ui(self):
+        """Vytvoří záložkové rozhraní obchodu."""
         layout = QVBoxLayout()
+        self.gold_label = QLabel(f"Tvé zlato: {self.character['gold']} g")
+        self.gold_label.setObjectName("goldLabel") # Pro QSS styling
+        self.gold_label.setAlignment(Qt.AlignmentFlag.AlignCenter); layout.addWidget(self.gold_label)
+
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet("""
+            QTabBar::tab { color: #e6e9f3; font-weight: bold; padding: 10px; }
+            QTabBar::tab:selected { background: #2a315a; }
+        """)
+        self.tab_widgets = {}
+        categories = [("weapon", "Zbraně"), ("head", "Hlava"), ("torso", "Trup"), ("legs", "Nohy"), ("consumable", "Lektvary")]
         
-        # Title
-        title = QLabel("Town Shop")
-        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        for cat_id, name in categories:
+            w = QWidget(); self.tab_widgets[cat_id] = w
+            self.tabs.addTab(w, name)
+
+        self._refresh_tabs()
+        layout.addWidget(self.tabs)
         
-        # Player gold
-        self.gold_label = QLabel(f"Your Gold: {self.character['gold']}")
-        self.gold_label.setFont(QFont("Arial", 12))
-        self.gold_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.gold_label)
+        self.status_label = QLabel(""); self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter); layout.addWidget(self.status_label)
         
-        # Items for sale
-        items_layout = QVBoxLayout()
-        
-        for item in self.shop_items:
-            item_layout = QHBoxLayout()
-            
-            # Item name and description
-            item_info = QLabel(f"{item['name']} - {item['bonus']} {item['stat'].capitalize()}")
-            item_info.setFont(QFont("Arial", 11))
-            
-            # Price
-            price_label = QLabel(f"{item['price']} gold")
-            
-            # Buy button
-            buy_button = QPushButton("Buy")
-            buy_button.setFixedWidth(60)
-            buy_button.clicked.connect(lambda checked, i=item: self.buy_item(i))
-            
-            item_layout.addWidget(item_info)
-            item_layout.addStretch()
-            item_layout.addWidget(price_label)
-            item_layout.addWidget(buy_button)
-            
-            items_layout.addLayout(item_layout)
-        
-        layout.addLayout(items_layout)
-        
-        # Status message
-        self.status_label = QLabel("")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.status_label)
-        
-        # Close button
-        close_button = QPushButton("Close")
-        close_button.clicked.connect(self.close_shop)
-        layout.addWidget(close_button)
-        
+        close_btn = QPushButton("Odejít"); close_btn.clicked.connect(self.accept); layout.addWidget(close_btn)
         self.setLayout(layout)
-    
-    def buy_item(self, item):
-        # Check if player has enough gold
-        if self.character['gold'] >= item['price']:
-            # Play buy sound
-            self.sound_manager.play_sound("buy", 
-                                         self.settings.value("sound_effects", False, type=bool))
+        self.setStyleSheet("QDialog { background: #0b0e1a; }")
+
+    def _refresh_tabs(self):
+        """Překreslí obsah všech záložek obchodu."""
+        for cat_id, widget in self.tab_widgets.items():
+            if widget.layout():
+                # Vyčištění starého obsahu
+                while widget.layout().count():
+                    item = widget.layout().takeAt(0)
+                    if item.widget(): item.widget().deleteLater()
+                    elif item.layout():
+                        while item.layout().count():
+                            sub = item.layout().takeAt(0)
+                            if sub.widget(): sub.widget().deleteLater()
+            else: widget.setLayout(QVBoxLayout())
             
-            # Deduct gold
-            self.character['gold'] -= item['price']
-            
-            # Update stats based on item type
-            if item['stat'] == 'attack':
-                self.character['attack'] += item['bonus']
-            elif item['stat'] == 'defense':
-                self.character['defense'] += item['bonus']
-            elif item['stat'] == 'potions':
-                self.character['potions'] += item['bonus']
-            
-            # Add to purchased items
-            self.purchased_items.append(item)
-            
-            # Update gold display
-            self.gold_label.setText(f"Your Gold: {self.character['gold']}")
-            
-            # Show success message
-            self.status_label.setText(f"Purchased {item['name']}!")
-            self.status_label.setStyleSheet("color: green;")
+            # Naplnění záložky předměty z katalogu
+            for item in [i for i in ITEM_CATALOG if i['type'] == cat_id]:
+                widget.layout().addLayout(self._create_item_row(item))
+            widget.layout().addStretch(1)
+
+    def _create_item_row(self, item):
+        """Vytvoří řádek s informacemi o předmětu a akčním tlačítkem."""
+        row = QHBoxLayout()
+        
+        # Ikona
+        icon = QLabel(); icon.setFixedSize(32, 32)
+        try:
+            path = os.path.join(os.path.dirname(__file__), "icons", item['icon'])
+            if os.path.isfile(path):
+                r = QSvgRenderer(path); px = QPixmap(32, 32); px.fill(Qt.GlobalColor.transparent)
+                p = QPainter(px); r.render(p); p.end(); icon.setPixmap(px)
+        except: pass
+        row.addWidget(icon)
+
+        # Informace
+        bonus_txt = f"+{item['bonus']} {item['stat']}" if item['type'] != 'consumable' else "Léčení"
+        info = QLabel(f"<b>{item['name']}</b> ({bonus_txt}) - {item['price']} g")
+        info.setStyleSheet("color: #e6e9f3; font-size: 13px;") # Zlepšená čitelnost textu
+        row.addWidget(info); row.addStretch(1)
+
+        # Tlačítko (Koupit / Vybavit / Vybaveno)
+        kind = item['type']
+        if kind == 'consumable':
+            btn = QPushButton("Koupit"); btn.clicked.connect(lambda _, i=item: self._buy_item(i))
+        elif item['name'] in self.owned[kind]:
+            is_eq = self.equipped[kind] == item['name']
+            btn = QPushButton("Vybaveno" if is_eq else "Vybavit")
+            btn.setEnabled(not is_eq); btn.clicked.connect(lambda _, i=item: self._equip_item(i))
         else:
-            # Show error message
-            self.status_label.setText("Not enough gold!")
-            self.status_label.setStyleSheet("color: red;")
-    
-    def close_shop(self):
-         # Stop shop music and return to regular music
-         self.sound_manager.stop_music()
-         # Just accept the dialog, the parent will handle music
-         self.accept()
+            btn = QPushButton("Koupit"); btn.clicked.connect(lambda _, i=item: self._buy_item(i))
+        
+        row.addWidget(btn); return row
+
+    def _buy_item(self, item):
+        """Zpracuje nákup předmětu."""
+        if self.character['gold'] < item['price']:
+            self.status_label.setText("Nedostatek zlata!"); return
+            
+        self.character['gold'] -= item['price']
+        kind = item['type']
+        
+        if kind == 'consumable':
+            self.character['potions'] += item['bonus']
+        else:
+            self.owned[kind].append(item['name'])
+            # Oprava plurálu pro 'legs' (nohy jsou již v plurálu)
+            suffix = "s" if kind != "legs" else ""
+            self.settings.setValue(f"owned_{kind}{suffix}_{self.char_id}", json.dumps(self.owned[kind]))
+            
+        self.gold_label.setText(f"Tvé zlato: {self.character['gold']} g")
+        if self.settings.value("effects_volume", 50, type=int) > 0: self.sound_manager.play_sound("buy", True)
+        self._refresh_tabs()
+
+    def _equip_item(self, item):
+        """Vybaví hráče vybraným předmětem."""
+        kind = item['type']
+        self.equipped[kind] = item['name']
+        self.settings.setValue(f"equipped_{kind}_{self.char_id}", item['name'])
+        self.status_label.setText(f"Vybaveno: {item['name']}")
+        self._refresh_tabs()
 
 class InnDialog(QDialog):
+    """
+    Hostinec slouží k léčení postavy a ukládání postupu hry.
+    Za poplatek doplní zdraví na maximum.
+    """
     def __init__(self, character, sound_manager, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Town Inn")
-        self.resize(500, 300)
-        self.character = character
-        self.sound_manager = sound_manager
+        self.setWindowTitle("Hostinec")
+        self.setFixedSize(450, 300)
+        self.character, self.sound_manager = character, sound_manager
         self.settings = QSettings("DungeonExplorer", "RPGGame")
-        # Healing cost (small gold price)
         self.heal_cost = 20
 
-        # Play inn music (ensure no overlap)
+        # Hudební kulisa hostince
         self.sound_manager.stop_music()
-        self.sound_manager.play_music("background_inn.wav",
-                                      self.settings.value("background_music", False, type=bool))
+        if self.settings.value("music_volume", 50, type=int) > 0:
+            self.sound_manager.play_music("background_inn.wav", True)
 
-        self.setup_ui()
-
-    def setup_ui(self):
         layout = QVBoxLayout()
+        title = QLabel("U Matěje"); title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter); layout.addWidget(title)
 
-        title = QLabel("Town Inn")
-        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        self.status_info = QLabel(f"Zlato: {self.character['gold']} | Životy: {self.character['health']}/{self.character['max_health']}")
+        self.status_info.setStyleSheet("font-size: 14px; color: #e6e9f3;")
+        self.status_info.setAlignment(Qt.AlignmentFlag.AlignCenter); layout.addWidget(self.status_info)
 
-        # Player status
-        self.gold_label = QLabel(f"Your Gold: {self.character['gold']}")
-        self.gold_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.gold_label)
+        btns = QHBoxLayout()
+        save_btn = QPushButton("Uložit hru"); save_btn.clicked.connect(self.save_game)
+        heal_btn = QPushButton(f"Vyléčit a uložit ({self.heal_cost} g)"); heal_btn.clicked.connect(self.heal_and_save)
+        btns.addWidget(save_btn); btns.addWidget(heal_btn); layout.addLayout(btns)
 
-        self.health_label = QLabel(f"Health: {self.character['health']}/{self.character['max_health']}")
-        self.health_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.health_label)
-
-        # Actions
-        actions_layout = QHBoxLayout()
-
-        save_btn = QPushButton("Save Game")
-        save_btn.clicked.connect(self.save_game)
-
-        heal_save_btn = QPushButton(f"Heal and Save ({self.heal_cost} gold)")
-        heal_save_btn.clicked.connect(self.heal_and_save)
-
-        actions_layout.addWidget(save_btn)
-        actions_layout.addWidget(heal_save_btn)
-        layout.addLayout(actions_layout)
-
-        # Status message
-        self.status_label = QLabel("")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.status_label)
-
-        # Close
-        close_btn = QPushButton("Close")
-        close_btn.clicked.connect(self.close_inn)
-        layout.addWidget(close_btn)
-
+        self.msg = QLabel(""); self.msg.setAlignment(Qt.AlignmentFlag.AlignCenter); layout.addWidget(self.msg)
+        close_btn = QPushButton("Odejít"); close_btn.clicked.connect(self.accept); layout.addWidget(close_btn)
         self.setLayout(layout)
 
     def save_game(self):
-        # Play save sound
-        if self.settings.value("sound_effects", False, type=bool):
-            self.sound_manager.play_sound("save")
-        # Call parent save
-        parent = self.parent()
-        if parent:
-            parent.save_character()
-            self.status_label.setText("Game saved!")
-            self.status_label.setStyleSheet("color: green;")
+        """Uloží aktuální stav postavy na server."""
+        if self.parent(): self.parent().save_character()
+        self.msg.setText("Hra uložena!"); self.msg.setStyleSheet("color: #22c55e;")
+        if self.settings.value("effects_volume", 50, type=int) > 0: self.sound_manager.play_sound("save", True)
 
     def heal_and_save(self):
+        """Vyléčí postavu za zlato a následně uloží hru."""
         if self.character['gold'] >= self.heal_cost:
-            # Deduct gold and heal to max
             self.character['gold'] -= self.heal_cost
             self.character['health'] = self.character['max_health']
-            # Play heal sound
-            if self.settings.value("sound_effects", False, type=bool):
-                self.sound_manager.play_sound("heal")
-            # Save game
-            parent = self.parent()
-            if parent:
-                parent.save_character()
-            # Update UI labels
-            self.gold_label.setText(f"Your Gold: {self.character['gold']}")
-            self.health_label.setText(f"Health: {self.character['health']}/{self.character['max_health']}")
-            self.status_label.setText("You are fully healed and saved!")
-            self.status_label.setStyleSheet("color: green;")
+            self.save_game()
+            self.status_info.setText(f"Zlato: {self.character['gold']} | Životy: {self.character['health']}/{self.character['max_health']}")
         else:
-            self.status_label.setText("Not enough gold to heal!")
-            self.status_label.setStyleSheet("color: red;")
-
-    def close_inn(self):
-        self.sound_manager.stop_music()
-        self.accept()
-
+            self.msg.setText("Nedostatek zlata!"); self.msg.setStyleSheet("color: #ef4444;")
 
 class CharacterSelectionDialog(QDialog):
+    """
+    Okno pro výběr existující postavy nebo vytvoření nové po přihlášení.
+    """
     def __init__(self, user_id, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Select Character")
-        self.resize(400, 300)
-        self.user_id = user_id
-        self.selected_character = None
+        self.setWindowTitle("Výběr hrdiny"); self.setFixedSize(400, 350)
+        self.user_id, self.selected_character = user_id, None
         
         layout = QVBoxLayout()
-        self.characters_layout = QVBoxLayout()
+        self.chars_layout = QVBoxLayout()
         
         self.load_characters()
         
-        new_char_button = QPushButton("Create New Character")
-        new_char_button.clicked.connect(self.create_character)
-        
-        layout.addWidget(QLabel("Select Your Character:"))
-        layout.addLayout(self.characters_layout)
-        layout.addWidget(new_char_button)
-        
+        new_btn = QPushButton("Vytvořit nového hrdinu"); new_btn.clicked.connect(self.create_character)
+        layout.addWidget(QLabel("Vyberte si svého hrdinu:"))
+        layout.addLayout(self.chars_layout)
+        layout.addStretch(1)
+        layout.addWidget(new_btn)
         self.setLayout(layout)
     
     def load_characters(self):
-        # Clear existing characters
-        for i in reversed(range(self.characters_layout.count())): 
-            widget = self.characters_layout.itemAt(i).widget()
-            if widget:
-                widget.setParent(None)
+        """Načte seznam postav přiřazených k uživateli ze serveru."""
+        while self.chars_layout.count():
+            w = self.chars_layout.takeAt(0).widget()
+            if w: w.deleteLater()
         
-        response = requests.get(f'http://localhost:5000/api/characters?user_id={self.user_id}')
-        if response.json().get('success'):
-            characters = response.json()['characters']
-            
-            if not characters:
-                self.characters_layout.addWidget(QLabel("No characters found. Create one!"))
-                return
-            
-            for char in characters:
-                char_button = QPushButton(
-                    f"{char['name']} (Level {char['level']}, {char['gold']} gold)"
-                )
-                char_button.clicked.connect(lambda checked, c=char: self.select_character(c))
-                self.characters_layout.addWidget(char_button)
+        try:
+            res = requests.get(f'http://localhost:5000/api/characters?user_id={self.user_id}', timeout=5).json()
+            if res.get('success'):
+                for char in res['characters']:
+                    btn = QPushButton(f"{char['name']} (Lvl {char['level']}, Skóre: {char.get('score', 0)})")
+                    btn.clicked.connect(lambda _, c=char: self.select(c))
+                    self.chars_layout.addWidget(btn)
+        except: pass
     
-    def select_character(self, character):
-        self.selected_character = character
-        self.accept()
+    def select(self, character):
+        self.selected_character = character; self.accept()
     
     def create_character(self):
-        name, ok = QLineEdit.getText(self, "New Character", "Enter character name:")
-        if ok and name:
-            response = requests.post('http://localhost:5000/api/characters', json={
-                'name': name,
-                'user_id': self.user_id
-            })
-            
-            if response.json().get('success'):
-                self.load_characters()
-            else:
-                QMessageBox.warning(self, "Error", "Failed to create character")
+        """Otevře dialog pro zadání jména nové postavy."""
+        name, ok = QLineEdit.getText(self, "Nový hrdina", "Jméno postavy:")
+        if ok and name.strip():
+            try:
+                res = requests.post('http://localhost:5000/api/characters', json={'name': name.strip(), 'user_id': self.user_id}, timeout=5).json()
+                if res.get('success'): self.load_characters()
+            except: pass
+
+class EndScreenDialog(QDialog):
+    """
+    Zobrazuje závěrečnou obrazovku (Work in Progress) po poražení finálního bosse.
+    """
+    def __init__(self, score, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Konec hry")
+        self.setFixedSize(400, 300)
+        self.setStyleSheet("QDialog { background: #0f1220; } QLabel { color: #e6e9f3; }")
+        
+        layout = QVBoxLayout()
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+        
+        title = QLabel("KONEC")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("font-size: 32px; font-weight: bold; color: #4f7cff;")
+        layout.addWidget(title)
+        
+        thanks = QLabel("Děkujeme za zahrání naší hry!")
+        thanks.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        thanks.setStyleSheet("font-size: 16px;")
+        layout.addWidget(thanks)
+        
+        score_label = QLabel(f"Tvé celkové skóre: {score}")
+        score_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        score_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffd700;")
+        layout.addWidget(score_label)
+        
+        layout.addStretch(1)
+        
+        btns = QHBoxLayout()
+        town_btn = QPushButton("Zpět do města")
+        town_btn.setStyleSheet("background: #4CAF50; padding: 10px;")
+        town_btn.clicked.connect(self.accept) # Accept = Návrat do města
+        
+        exit_btn = QPushButton("Ukončit hru")
+        exit_btn.setStyleSheet("background: #ef4444; padding: 10px;")
+        exit_btn.clicked.connect(self.reject) # Reject = Vypnutí hry
+        
+        btns.addWidget(town_btn)
+        btns.addWidget(exit_btn)
+        layout.addLayout(btns)
+        
+        self.setLayout(layout)
 
 class RPGGame(QMainWindow):
+    """
+    Hlavní třída hry Pcherské Legendy. 
+    Spravuje herní logiku, uživatelské rozhraní a komunikaci se serverem.
+    """
     def __init__(self):
         super().__init__()
-        
-        # Initialize sound manager
         self.sound_manager = SoundManager()
+        self.settings = QSettings("DungeonExplorer", "RPGGame")
         
-        # Show login dialog first
-        login_dialog = LoginDialog()
-        if login_dialog.exec() != QDialog.DialogCode.Accepted:
-            sys.exit(0)
+        # Načtení a aplikace nastavení hlasitosti
+        mv = self.settings.value("music_volume", 50, type=int)
+        ev = self.settings.value("effects_volume", 50, type=int)
+        self.sound_manager.set_music_volume(mv / 100.0)
+        self.sound_manager.set_effects_volume(ev / 100.0)
         
-        self.user_data = login_dialog.user_data
+        # Proces přihlášení
+        login = LoginDialog()
+        if login.exec() != QDialog.DialogCode.Accepted: sys.exit(0)
+        self.user_data = login.user_data
         
-        # Show character selection
-        char_dialog = CharacterSelectionDialog(self.user_data['user_id'])
-        if char_dialog.exec() != QDialog.DialogCode.Accepted:
-            sys.exit(0)
+        # Výběr hrdiny
+        char_sel = CharacterSelectionDialog(self.user_data['user_id'])
+        if char_sel.exec() != QDialog.DialogCode.Accepted: sys.exit(0)
+        self.character = char_sel.selected_character
         
-        self.character = char_dialog.selected_character
-
-        self.setWindowTitle(f"Dungeon Explorer - {self.character['name']}")
-        self.resize(600, 700)
+        # Inicializace herních dat a UI
+        self._init_attributes()
+        self.setWindowTitle(f"Pcherské Legendy - {self.character['name']}")
+        self.resize(1000, 800); self.setMinimumSize(800, 600)
         
-        # Game state
+        # Herní stav
         self.current_room = "town"
         self.current_enemy = None
-        self.game_log = [f"Welcome {self.character['name']}!", "You are in the town square."]
+        self.dungeon = {"level": 1, "progress": 0, "steps_required": 20}
+        self.content = {"events": {}, "enemies": {}, "boss": {}}
 
-        # Dungeon state
-        self.dungeon = {
-            "level": 1,
-            "progress": 0,
-            "steps_required": 20,
-            "state": "idle"  # idle | event | combat | completed
-        }
-
-        # Content loaded from JSON
-        self.content = {
-            "events": {},   # { level: [event, ...] }
-            "enemies": {},  # { level: [enemy, ...] }
-            "boss": {}      # { level: boss_enemy }
-        }
-        
-        # Initialize UI
-        self.health_bar = None
-        self.stats_label = None
-        self.log_display = None
-        self.location_label = None
-        self.combat_label = None
-        
         self.setup_ui()
-        # Disable autosave: saving is only available at the Inn
-        self.autosave_timer = None
-
-        # Load sound effects
-        self.load_sounds()
-
-        # Load external content (events/enemies) from JSON
-        self.load_content()
-
-        # Play background music if enabled
+        self._load_game_resources()
         self.play_background_music()
 
-        # Initialize EXP threshold meta
-        # Ensure level/exp keys exist and set exp_to_level for display
-        self.character.setdefault('level', 1)
-        self.character.setdefault('exp', 0)
-        self.character['exp_to_level'] = self.exp_needed_for_next(self.character['level'])
-    
-    def setup_ui(self):
-        # Set game version
-        self.game_version = "v0.0.1"
+    def _load_game_resources(self):
+        """Načte zvuky a externí herní obsah (nepřátelé, události)."""
+        self._create_sample_sounds()
+        for s in ["attack", "potion", "explore", "click", "buy", "heal", "save"]:
+            self.sound_manager.load_sound(s, f"{s}.wav")
         
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout()
-        
-        # Header with version and settings (center title removed to free space)
-        header_layout = QHBoxLayout()
-        
-        # Right side container for version and settings
-        right_container = QVBoxLayout()
-        
-        # Version in top right
-        version_label = QLabel(self.game_version)
-        version_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
-        version_label.setStyleSheet("color: #666; font-size: 10px;")
-        right_container.addWidget(version_label)
-        
-        # Settings button (cogwheel)
-        settings_button = QPushButton("⚙")
-        settings_button.setFixedSize(30, 30)
-        settings_button.setStyleSheet("""
-            QPushButton {
-                font-size: 16px;
-                background-color: #f0f0f0;
-                border-radius: 15px;
-                border: 1px solid #ccc;
-            }
-            QPushButton:hover {
-                background-color: #e0e0e0;
-            }
-        """)
-        settings_button.clicked.connect(self.show_options_dialog)
-        
-        settings_container = QHBoxLayout()
-        settings_container.addStretch()
-        settings_container.addWidget(settings_button)
-        right_container.addLayout(settings_container)
-        
-        header_layout.addLayout(right_container, 0)
-        
-        layout.addLayout(header_layout)
-        
-        # Player stats
-        stats_layout = QHBoxLayout()
-        
-        self.stats_label = QLabel()
-        
-        # Remove visual health bar; keep compact stats only
-        stats_layout.addWidget(self.stats_label)
-        layout.addLayout(stats_layout)
-        
-        # Location info
-        location_box = QVBoxLayout()
-        self.location_label = QLabel("Current Location")
-        self.location_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        self.location_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        location_box.addWidget(self.location_label)
-        layout.addLayout(location_box)
-        
-        # Game log
-        log_box = QVBoxLayout()
-        log_title = QLabel("Adventure Log")
-        log_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        self.log_display = QTextEdit()
-        self.log_display.setReadOnly(True)
-        # Increase height and allow much longer play history
-        self.log_display.setMinimumHeight(300)
-        self.log_display.setUndoRedoEnabled(False)
-        log_box.addWidget(log_title)
-        log_box.addWidget(self.log_display)
-        layout.addLayout(log_box)
-        
-        # Action buttons
-        action_box = QVBoxLayout()
-        action_title = QLabel("Actions")
-        action_title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        action_box.addWidget(action_title)
-        
-        # Town actions
-        town_actions = QHBoxLayout()
-        explore_btn = QPushButton("Explore Dungeon")
-        # Keep a reference for visibility control in both town and dungeon
-        self.explore_btn = explore_btn
-        shop_btn = QPushButton("Visit Shop")
-        rest_btn = QPushButton("Rest at Inn")
-        
-        explore_btn.clicked.connect(self.explore_dungeon)
-        shop_btn.clicked.connect(self.visit_shop)
-        rest_btn.clicked.connect(self.rest_at_inn)
-        
-        town_actions.addWidget(explore_btn)
-        town_actions.addWidget(shop_btn)
-        town_actions.addWidget(rest_btn)
-        action_box.addLayout(town_actions)
-        
-        # Dungeon actions (only visible in dungeon)
-        dungeon_actions = QHBoxLayout()
-        self.return_town_btn = QPushButton("Return to Town")
-        # Attach icon if available
         try:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            icon_path = os.path.join(base_dir, "icons", "return_to_town.svg")
-            if os.path.isfile(icon_path):
-                self.return_town_btn.setIcon(QIcon(icon_path))
-        except Exception:
-            pass
-        self.return_town_btn.clicked.connect(self.return_to_town)
-        dungeon_actions.addWidget(self.return_town_btn)
-        action_box.addLayout(dungeon_actions)
+            path = os.path.join(os.path.dirname(__file__), "data")
+            with open(os.path.join(path, "events.json"), "r", encoding="utf-8") as f:
+                self.content["events"] = json.load(f).get("levels", {})
+            with open(os.path.join(path, "enemies.json"), "r", encoding="utf-8") as f:
+                lvls = json.load(f).get("levels", {})
+                self.content["boss"] = lvls.get("boss", {})
+                self.content["enemies"] = {k: v for k, v in lvls.items() if k != "boss"}
+        except: pass
+
+    def setup_ui(self):
+        """Sestaví hlavní rozhraní hry pomocí PyQt6 layoutů."""
+        self.game_version = "v0.6.1"
+        central = QWidget(); central.setObjectName("central"); self.setCentralWidget(central)
+        main_layout = QVBoxLayout(); main_layout.setContentsMargins(15, 15, 15, 15); main_layout.setSpacing(10)
         
-        # Store town and dungeon action widgets for visibility management
-        # Explore button belongs to town widgets, and we explicitly show it in dungeon
-        self.town_action_widgets = [explore_btn, shop_btn, rest_btn]
-        self.dungeon_action_widgets = [self.return_town_btn]
+        # Horní lišta (Verze + Systémová tlačítka)
+        header = QHBoxLayout()
+        header.addWidget(QLabel(self.game_version))
+        header.addStretch()
         
-        # Combat section (initially hidden)
-        combat_box = QVBoxLayout()
-        self.combat_label = QLabel("Combat")
-        self.combat_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        self.fs_btn = QPushButton(); self.fs_btn.setObjectName("fullscreenBtn"); self.fs_btn.setFixedSize(30,30)
+        self.fs_btn.clicked.connect(self.toggle_fullscreen)
+        self._set_svg_icon(self.fs_btn, "fullscreen.svg", "⛶")
         
-        combat_buttons = QHBoxLayout()
-        attack_btn = QPushButton("Attack")
-        use_potion_btn = QPushButton("Use Potion")
-        flee_btn = QPushButton("Flee")
+        set_btn = QPushButton("⚙"); set_btn.setObjectName("settingsBtn"); set_btn.setFixedSize(30,30)
+        set_btn.clicked.connect(self.show_options_dialog)
         
-        attack_btn.clicked.connect(self.attack_enemy)
-        use_potion_btn.clicked.connect(self.use_potion)
+        header.addWidget(self.fs_btn); header.addWidget(set_btn); main_layout.addLayout(header)
+        
+        # Sekce statistik a vybavení
+        top_section = QHBoxLayout(); top_section.setSpacing(20)
+        
+        # 1. Základní statistiky (vlevo)
+        self.stats_label = QLabel(); top_section.addWidget(self.stats_label, 1)
+
+        # 2. Vybavení postavy (střed)
+        self.equip_layout = QGridLayout(); self.equip_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.equip_layout.setSpacing(10)
+        
+        self.head_slot = QLabel(); self.torso_slot = QLabel(); self.legs_slot = QLabel(); self.weapon_slot = QLabel()
+        for s in [self.head_slot, self.torso_slot, self.legs_slot, self.weapon_slot]:
+            s.setFixedSize(50, 50); s.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            s.setStyleSheet("background: #1a1f3a; border: 1px solid #2a315a; border-radius: 8px;")
+
+        # Armor vertically aligned (Column 0)
+        self.equip_layout.addWidget(self.head_slot, 0, 0)
+        self.equip_layout.addWidget(self.torso_slot, 1, 0)
+        self.equip_layout.addWidget(self.legs_slot, 2, 0)
+        
+        # Weapon to the side (Column 1, Row 1 - next to torso)
+        self.equip_layout.addWidget(self.weapon_slot, 1, 1)
+        
+        top_section.addLayout(self.equip_layout, 1)
+
+        # 3. Atributy a body (vpravo)
+        attrs_box = QVBoxLayout(); attrs_box.addWidget(QLabel("<b>Vlastnosti</b>"))
+        self.attr_label = QLabel(); self.points_label = QLabel()
+        r1, r2 = QHBoxLayout(), QHBoxLayout()
+        self.str_btn = QPushButton("+ STR"); self.dex_btn = QPushButton("+ DEX")
+        self.con_btn = QPushButton("+ CON"); self.int_btn = QPushButton("+ INT")
+        for b, a in [(self.str_btn, 'strength'), (self.dex_btn, 'dexterity'), (self.con_btn, 'constitution'), (self.int_btn, 'intelligence')]:
+            b.clicked.connect(lambda _, attr=a: self.allocate_point(attr))
+        r1.addWidget(self.str_btn); r1.addWidget(self.dex_btn)
+        r2.addWidget(self.con_btn); r2.addWidget(self.int_btn)
+        attrs_box.addWidget(self.attr_label); attrs_box.addWidget(self.points_label)
+        attrs_box.addLayout(r1); attrs_box.addLayout(r2); top_section.addLayout(attrs_box, 1)
+        
+        main_layout.addLayout(top_section); main_layout.addSpacing(10)
+
+        # Informační oblast (Lokace + Souboj)
+        self.location_label = QLabel(""); self.location_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.location_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #9bb4ff;")
+        self.combat_label = QLabel(""); self.combat_label.setMinimumHeight(100)
+        self.combat_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.combat_label.setStyleSheet("color: #ef4444;")
+        main_layout.addWidget(self.location_label); main_layout.addWidget(self.combat_label)
+
+        # Herní deník (Log)
+        log_box = QVBoxLayout(); log_box.addWidget(QLabel("<b>Deník hrdiny</b>"))
+        self.log_display = QTextEdit(); self.log_display.setReadOnly(True)
+        self.log_display.setObjectName("log") # Důležité pro propojení se stylem v APP_QSS
+        log_box.addWidget(self.log_display); main_layout.addLayout(log_box, 1)
+
+        # Ovládací tlačítka (Akce)
+        actions = QWidget(); a_layout = QHBoxLayout(actions); a_layout.setContentsMargins(0, 5, 0, 0)
+        self.explore_btn = QPushButton("Průzkum"); self.explore_btn.setObjectName("exploreBtn")
+        shop_btn = QPushButton("Obchod"); rest_btn = QPushButton("Hostinec")
+        self.return_town_btn = QPushButton("Zpět do města"); self.return_town_btn.setObjectName("returnTownBtn")
+        att_btn = QPushButton("Útok"); att_btn.setObjectName("attackBtn")
+        pot_btn = QPushButton("Lektvar"); pot_btn.setObjectName("usePotionBtn")
+        flee_btn = QPushButton("Útěk"); flee_btn.setObjectName("fleeBtn")
+
+        self.explore_btn.clicked.connect(self.explore_dungeon); shop_btn.clicked.connect(self.visit_shop)
+        rest_btn.clicked.connect(self.rest_at_inn); self.return_town_btn.clicked.connect(self.return_to_town)
+        att_btn.clicked.connect(self.attack_enemy); pot_btn.clicked.connect(self.use_potion)
         flee_btn.clicked.connect(self.flee_combat)
-        
-        combat_buttons.addWidget(attack_btn)
-        combat_buttons.addWidget(use_potion_btn)
-        combat_buttons.addWidget(flee_btn)
-        
-        combat_box.addWidget(self.combat_label)
-        combat_box.addLayout(combat_buttons)
-        
-        # Store combat widgets for hiding/showing
-        self.combat_widgets = [self.combat_label, attack_btn, use_potion_btn, flee_btn]
-        
-        action_box.addLayout(combat_box)
-        layout.addLayout(action_box)
-        
-        central_widget.setLayout(layout)
-        
-        # Initialize game state
-        self.update_stats()
-        self.update_log("Úspěšné přihlášení")
-        self.update_location()
-        self.update_actions()
-        self.hide_combat_ui()
-    
+
+        a_layout.addWidget(self.explore_btn); a_layout.addWidget(shop_btn); a_layout.addWidget(rest_btn)
+        a_layout.addStretch(1); a_layout.addWidget(self.return_town_btn)
+        a_layout.addWidget(att_btn); a_layout.addWidget(pot_btn); a_layout.addWidget(flee_btn)
+
+        # Seskupení widgetů pro snadné přepínání viditelnosti
+        self.town_widgets = [shop_btn, rest_btn]
+        self.combat_widgets = [att_btn, pot_btn, flee_btn]
+
+        main_layout.addWidget(actions); central.setLayout(main_layout)
+        self.update_stats(); self.update_location(); self.update_actions()
+
+    def _set_svg_icon(self, btn, icon_name, fallback):
+        """Pomocná metoda pro nastavení SVG ikony na tlačítko."""
+        try:
+            path = os.path.join(os.path.dirname(__file__), "icons", icon_name)
+            if os.path.isfile(path):
+                r = QSvgRenderer(path); px = QPixmap(20,20); px.fill(Qt.GlobalColor.transparent)
+                p = QPainter(px); r.render(p); p.end(); btn.setIcon(QIcon(px))
+            else: btn.setText(fallback)
+        except: btn.setText(fallback)
+
     def update_stats(self):
-        """Update character stats in the UI"""
-        exp_to_level = self.character.get('exp_to_level', 'N/A')  # Use 'N/A' if the key is missing
-        stats = (
-            f"Name: {self.character['name']}\n"
-            f"Level: {self.character['level']}\n"
-            f"EXP: {self.character['exp']}/{exp_to_level}\n"
-            f"Gold: {self.character['gold']}\n"
-            f"Health: {self.character['health']}/{self.character['max_health']}\n"
-            f"Attack: {self.character['attack']}\n"
-            f"Defense: {self.character['defense']}\n"
-            f"Potions: {self.character['potions']}"
-        )
-        self.stats_label.setText(stats)
+        """Přepočítá statistiky a aktualizuje textové popisky v UI."""
+        self._recalculate_total_stats()
+        c = self.character; next_exp = 10 * max(1, c['level'])
+        self.stats_label.setText(f"<b>{c['name']}</b> (Lvl {c['level']})<br>"
+                                f"HP: {c['health']}/{c['max_health']}<br>"
+                                f"Útok: {c['attack']} | Obrana: {c['defense']}<br>"
+                                f"Zlato: {c['gold']} g | Skóre: {c.get('score',0)}<br>"
+                                f"EXP: {c['exp']}/{next_exp}<br>"
+                                f"Lektvary: {c.get('potions', 0)}")
+        
+        self.attr_label.setText(f"STR: {c.get('strength',5)} | DEX: {c.get('dexterity',5)}<br>"
+                                f"CON: {c.get('constitution',10)} | INT: {c.get('intelligence',5)}")
+        
+        pts = c.get('stat_points', 0)
+        self.points_label.setText(f"Volné body: {pts}" if pts > 0 else "")
+        for b in [self.str_btn, self.dex_btn, self.con_btn, self.int_btn]: b.setVisible(pts > 0)
+        self._update_equip_ui()
         
     def update_log(self, message):
-        """Add a message to the game log"""
-        self.game_log.append(message)
-        if hasattr(self, 'log_display') and self.log_display is not None:
-            # Append incrementally and auto-scroll to bottom
-            self.log_display.append(message)
-            sb = self.log_display.verticalScrollBar()
-            if sb is not None:
-                sb.setValue(sb.maximum())
-        else:
-            print(f"Game Log: {message}")  # Fallback if log_display is not initialized
+        """Přidá zprávu do deníku a zajistí odrolování na konec."""
+        self.log_display.append(message)
+        self.log_display.moveCursor(QTextCursor.MoveOperation.End)
     
     def update_location(self):
-        """Update the player's location in the UI."""
-        if self.current_room == "town":
-            location_text = "Town Square"
-        elif self.current_room == "dungeon":
-            # Level names mapping
-            level_names = {
-                1: "Sewers"
-                # Add more levels later: 2: "Cellars", etc.
-            }
-            level_name = level_names.get(self.dungeon['level'], f"Unknown Level {self.dungeon['level']}")
-            location_text = f"Lvl {self.dungeon['level']} - {level_name}"
-        elif self.current_room == "shop":
-            location_text = "Town Shop"
-        elif self.current_room == "inn":
-            location_text = "Town Inn"
+        """Aktualizuje název aktuálně navštíveného místa."""
+        if self.current_room == "town": 
+            text = "Městské náměstí"
         else:
-            location_text = self.current_room.capitalize()
+            lvl = self.dungeon['level']
+            if lvl == 1:
+                name = "Sewers"
+            elif lvl == 2:
+                name = "Goblin Warrens"
+            else:
+                name = f"Dungeon Lvl {lvl}"
             
-        if hasattr(self, 'location_label') and self.location_label is not None:
-            self.location_label.setText(location_text)
-        else:
-            print(f"Current location: {location_text}")
+            progress = self.dungeon['progress']
+            total = self.dungeon['steps_required']
+            text = f"{name} (Krok {progress}/{total})"
+        self.location_label.setText(text)
 
     def update_actions(self):
-        """Update the available actions in the UI."""
-        # This method is now handled by the buttons in the UI
-        print(f"Available actions: Explore Dungeon, Visit Shop, Rest at Inn")
+        """Zobrazuje nebo skrývá tlačítka podle aktuálního herního stavu."""
+        is_town = self.current_room == "town"
+        in_fight = self.current_enemy is not None
         
-        # Show/hide action buttons based on current room
-        if self.current_room == "town":
-            # Show town actions, hide dungeon actions
-            for widget in self.town_action_widgets:
-                widget.show()
-            for widget in self.dungeon_action_widgets:
-                widget.hide()
-        elif self.current_room == "dungeon":
-            # Hide non-dungeon town actions, show Return + Explore when not in combat/event
-            for widget in self.town_action_widgets:
-                widget.hide()
-            if self.current_enemy is None and self.dungeon.get("state") not in ("event", "combat"):
-                for widget in self.dungeon_action_widgets:
-                    widget.show()
-                # Show explore in dungeon as "Advance"
-                if hasattr(self, "explore_btn"):
-                    self.explore_btn.show()
-            else:
-                for widget in self.dungeon_action_widgets:
-                    widget.hide()
-                if hasattr(self, "explore_btn"):
-                    self.explore_btn.hide()
+        for w in self.town_widgets: w.setVisible(is_town)
+        self.explore_btn.setVisible(not in_fight) # Skrýt průzkum během souboje
+        self.return_town_btn.setVisible(not is_town and not in_fight)
+        for w in self.combat_widgets: w.setVisible(in_fight)
         
-        # Show/hide combat UI based on current room
-        if self.current_room == "dungeon" and self.current_enemy is not None:
-            self.show_combat_ui()
-        else:
-            self.hide_combat_ui()
-            
-    def show_combat_ui(self):
-        """Show combat-related UI elements."""
-        if hasattr(self, 'combat_widgets'):
-            for widget in self.combat_widgets:
-                widget.show()
-        else:
-            print("Combat UI shown")
-
-    def hide_combat_ui(self):
-        """Hide combat-related UI elements."""
-        if hasattr(self, 'combat_widgets'):  # Assuming there's a list of combat-related widgets
-            for widget in self.combat_widgets:
-                widget.hide()  # Hide each combat-related widget
-        else:
-            print("Combat UI hidden")  # Fallback to a simple message
+        self.update_combat_display()
             
     def save_character(self):
-        """Save character data to the server"""
-        try:
-            response = requests.put(
-                f'http://localhost:5000/api/characters/{self.character["id"]}',
-                json=self.character
-            )
-            if response.status_code == 200:
-                self.update_log("Character saved successfully")
-            else:
-                self.update_log(f"Error saving character: {response.status_code}")
-        except Exception as e:
-            self.update_log(f"Error saving character: {str(e)}")
-            # Continue game even if save fails
+        """Odešle aktuální data postavy na server k uložení."""
+        try: requests.put(f'http://localhost:5000/api/characters/{self.character["id"]}', json=self.character, timeout=5)
+        except: pass
             
+    def toggle_fullscreen(self):
+        """Přepíná okno mezi režimem celé obrazovky a normálním zobrazením."""
+        if self.isFullScreen(): self.showNormal()
+        else: self.showFullScreen()
+
     def show_options_dialog(self):
-        """Show the options dialog"""
-        dialog = OptionsDialog(self)
-        if dialog.exec():
-            # Apply settings if needed
-            settings = QSettings("DungeonExplorer", "RPGGame")
-            sound_enabled = settings.value("sound_effects", False, type=bool)
-            music_enabled = settings.value("background_music", False, type=bool)
-            
-            # Log the settings changes
-            self.update_log(f"Settings updated: Sound {'enabled' if sound_enabled else 'disabled'}, Music {'enabled' if music_enabled else 'disabled'}")
-            
-            # Apply sound settings
-            if music_enabled:
-                self.play_background_music()
-            else:
-                self.sound_manager.stop_music()
-                
-    def load_sounds(self):
-        """Load all game sound effects"""
-        # Create sample sound files if they don't exist
-        self.create_sample_sounds()
-        
-        # Load sound effects
-        self.sound_manager.load_sound("attack", "attack.wav")
-        self.sound_manager.load_sound("potion", "potion.wav")
-        self.sound_manager.load_sound("explore", "explore.wav")
-        self.sound_manager.load_sound("click", "click.wav")
-        self.sound_manager.load_sound("buy", "buy.wav")
-        self.sound_manager.load_sound("heal", "heal.wav")
-        self.sound_manager.load_sound("save", "save.wav")
-    
+        """Otevře nastavení a aplikuje změny hlasitosti."""
+        if OptionsDialog(self).exec():
+            mv = self.settings.value("music_volume", 50, type=int)
+            ev = self.settings.value("effects_volume", 50, type=int)
+            self.sound_manager.set_music_volume(mv/100.0)
+            self.sound_manager.set_effects_volume(ev/100.0)
+            self.play_background_music()
+
     def play_background_music(self):
-        """Play background music if enabled"""
-        settings = QSettings("DungeonExplorer", "RPGGame")
-        music_enabled = settings.value("background_music", False, type=bool)
+        """Spouští hudbu odpovídající aktuální situaci."""
+        vol = self.settings.value("music_volume", 50, type=int)
+        if vol <= 0: self.sound_manager.stop_music(); return
         
-        if music_enabled:
-            self.sound_manager.play_music("background.wav", True)
+        track = "background.wav"
+        if self.current_enemy:
+            if self.current_enemy.get('is_boss'):
+                # Pokusíme se načíst specifickou boss hudbu z dat nepřítele
+                track = self.current_enemy.get('music', "background_boss.wav")
+            else:
+                track = "background.wav"
+        elif self.current_room == "town":
+            track = "background.wav"
+            
+        self.sound_manager.play_music(track, True)
 
-    def play_boss_music(self):
-        """Play boss background music if enabled (placeholder file)."""
-        settings = QSettings("DungeonExplorer", "RPGGame")
-        music_enabled = settings.value("background_music", False, type=bool)
-        if music_enabled:
-            # Use a dedicated boss track; user can replace/edit this file
-            self.sound_manager.play_music("background_boss.wav", True)
-    
-    def create_sample_sounds(self):
-        """Create sample sound files if they don't exist"""
-        import os
-        import wave
-        import struct
-        import array
-        import math
-        
-        # Create sounds directory if it doesn't exist
+    def _create_sample_sounds(self):
+        """Vytvoří základní zvukové soubory, pokud ve složce sounds chybí."""
         os.makedirs('sounds', exist_ok=True)
-        
-        # Only create files if they don't exist
-        sound_files = {
-            "attack.wav": (8000, 0.3, 220.0),  # Attack sound (lower pitch)
-            "potion.wav": (8000, 0.3, 440.0),  # Potion sound (medium pitch)
-            "explore.wav": (8000, 0.3, 880.0), # Explore sound (higher pitch)
-            "click.wav": (8000, 0.1, 660.0),   # Click sound (short)
-            "background.wav": (8000, 2.0, 330.0),  # Background music (longer)
-            "background_boss.wav": (8000, 2.5, 110.0)  # Boss music (lower ominous tone)
+        # Jednoduchá syntéza sinusových vln pro různé efekty
+        sounds = {
+            "attack.wav": (8000, 0.2, 220), "potion.wav": (8000, 0.3, 440),
+            "explore.wav": (8000, 0.1, 880), "click.wav": (8000, 0.05, 600),
+            "background.wav": (8000, 2.0, 330), "background_boss.wav": (8000, 2.0, 110),
+            "background_shop.wav": (8000, 2.0, 220), "background_inn.wav": (8000, 2.0, 165),
+            "buy.wav": (8000, 0.2, 550), "heal.wav": (8000, 0.4, 440), "save.wav": (8000, 0.3, 330)
         }
-        
-        for filename, (sample_rate, duration, frequency) in sound_files.items():
-            file_path = os.path.join('sounds', filename)
-            if not os.path.exists(file_path):
-                # Create a simple sine wave as a placeholder sound
-                samples = int(duration * sample_rate)
-                audio_data = array.array('h', [
-                    max(-32767, min(32767, int(32767 * 0.3 * 
-                    math.sin(2 * math.pi * frequency * i / sample_rate))))
-                    for i in range(samples)])
-                
-                with wave.open(file_path, 'w') as wave_file:
-                    wave_file.setparams((1, 2, sample_rate, samples, 'NONE', 'not compressed'))
-                    wave_file.writeframes(audio_data.tobytes())
-
-    def exp_needed_for_next(self, level):
-        """Return EXP needed to reach the next level."""
-        # Simple linear progression: 10 * current level
-        return 10 * max(1, int(level))
+        for name, (sr, dur, freq) in sounds.items():
+            p = os.path.join('sounds', name)
+            if not os.path.exists(p):
+                data = array.array('h', [int(16000 * math.sin(2 * math.pi * freq * i / sr)) for i in range(int(dur * sr))])
+                with wave.open(p, 'w') as wf:
+                    wf.setparams((1, 2, sr, len(data), 'NONE', 'not compressed'))
+                    wf.writeframes(data.tobytes())
 
     def check_level_up(self):
-        """Check if EXP meets threshold; level up without changing stats."""
-        exp_to_level = self.exp_needed_for_next(self.character['level'])
-        # Keep rollover EXP into next level(s)
-        leveled_up = False
-        while self.character['exp'] >= exp_to_level:
-            self.character['exp'] -= exp_to_level
+        """Zpracuje postup na novou úroveň, pokud má hráč dostatek EXP."""
+        leveled = False
+        while self.character['exp'] >= 10 * self.character['level']:
+            self.character['exp'] -= 10 * self.character['level']
             self.character['level'] += 1
-            leveled_up = True
-            exp_to_level = self.exp_needed_for_next(self.character['level'])
-        # Update displayed threshold
-        self.character['exp_to_level'] = exp_to_level
-        if leveled_up:
-            self.update_log(f"Level Up! You reached Level {self.character['level']}.")
+            self.character['stat_points'] = self.character.get('stat_points', 0) + 3
+            leveled = True
+        if leveled:
+            self.update_log(f"<b>LEVEL UP!</b> Dosáhl jsi úrovně {self.character['level']}.")
             self.update_stats()
 
-# Action methods with sound effects
-    def explore_dungeon(self):
-        """Enter or advance through the dungeon with placeholder outcomes."""
-        settings = QSettings("DungeonExplorer", "RPGGame")
-        if settings.value("sound_effects", False, type=bool):
-            self.sound_manager.play_sound("explore")
+    def allocate_point(self, attr):
+        """Přidělí volný bod zvolenému atributu a uloží do nastavení."""
+        if self.character.get('stat_points', 0) > 0:
+            self.character[attr] = self.character.get(attr, 0) + 1
+            self.character['stat_points'] -= 1
+            cid = str(self.character['id'])
+            self.settings.setValue(f"{attr}_{cid}", self.character[attr])
+            self.settings.setValue(f"stat_points_{cid}", self.character['stat_points'])
+            self._init_attributes()
+            self.update_stats()
 
-        # Enter dungeon from town
-        if self.current_room != "dungeon":
-            self.current_room = "dungeon"
-            self.update_location()
-            self.update_actions()  # Update button visibility
-            self.update_log("You step into the dungeon sewers...")
-            return
+    def _init_attributes(self):
+        """Inicializuje základní i odvozené atributy postavy."""
+        cid = str(self.character['id'])
+        for a in ['strength', 'dexterity', 'constitution', 'intelligence']:
+            self.character[a] = self.settings.value(f"{a}_{cid}", 5 if a != 'constitution' else 10, type=int)
+        self.character['stat_points'] = self.settings.value(f"stat_points_{cid}", 0, type=int)
+        
+        # Odvozené statistiky
+        self.character['base_attack'] = self.character['strength'] + self.character['dexterity']
+        self.character['base_defense'] = 5
+        self.character['max_health'] = self.character['constitution'] * 10
+        self.character['health'] = min(self.character.get('health', self.character['max_health']), self.character['max_health'])
+        self._recalculate_total_stats()
 
-        # If in dungeon, attempt to advance
-        self.advance_dungeon()
+    def _recalculate_total_stats(self):
+        """Přepočítá celkový útok a obranu na základě aktuálního vybavení."""
+        self.character['attack'] = self.character['base_attack']
+        self.character['defense'] = self.character['base_defense']
+        
+        cid = str(self.character['id'])
+        for k in ['weapon', 'head', 'torso', 'legs']:
+            name = self.settings.value(f"equipped_{k}_{cid}", "", type=str)
+            self.character[f'equipped_{k}'] = name
+            
+            # Bonus z katalogu
+            bonus = 0
+            for it in ITEM_CATALOG:
+                if it['name'] == name: bonus = it['bonus']; break
+            
+            if k == 'weapon': self.character['attack'] += bonus
+            else: self.character['defense'] += bonus
 
-    def load_content(self):
-        """Load events and enemies from JSON files with basic validation."""
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(base_dir, "data")
-        # Events
-        events_path = os.path.join(data_dir, "events.json")
-        enemies_path = os.path.join(data_dir, "enemies.json")
+    def _update_equip_ui(self):
+        """Aktualizuje vizuální sloty vybavení v hlavním okně s tooltipy obsahujícími statistiky."""
+        slots = [
+            (self.head_slot, 'equipped_head', "empty_head.svg"),
+            (self.torso_slot, 'equipped_torso', "empty_torso.svg"),
+            (self.legs_slot, 'equipped_legs', "empty_legs.svg"),
+            (self.weapon_slot, 'equipped_weapon', "empty_weapon.svg")
+        ]
+        for label, key, empty_icon in slots:
+            name = self.character.get(key, "")
+            icon = ICON_MAP.get(name, empty_icon)
+            
+            # Vyhledání statistik předmětu pro tooltip
+            tooltip_text = "Prázdné"
+            if name:
+                bonus_info = ""
+                for it in ITEM_CATALOG:
+                    if it['name'] == name:
+                        bonus_info = f" (+{it['bonus']} {it['stat']})"
+                        break
+                tooltip_text = f"{name}{bonus_info}"
+            
+            self._render_svg_to_label(label, icon, tooltip_text)
+
+    def _render_svg_to_label(self, label, icon_name, tooltip):
+        """Vykreslí SVG ikonu do QLabelu."""
         try:
-            if os.path.isfile(events_path):
-                with open(events_path, "r", encoding="utf-8") as f:
-                    events = json.load(f)
-                self.content["events"] = events.get("levels", {})
-            else:
-                self.content["events"] = {}
-            if os.path.isfile(enemies_path):
-                with open(enemies_path, "r", encoding="utf-8") as f:
-                    enemies = json.load(f)
-                levels = enemies.get("levels", {})
-                # Separate boss mapping if present
-                boss = levels.get("boss", {}) if isinstance(levels.get("boss", {}), dict) else {}
-                self.content["boss"] = boss
-                # Remove boss from regular enemies
-                if "boss" in levels:
-                    levels = {k: v for k, v in levels.items() if k != "boss"}
-                self.content["enemies"] = levels
-            else:
-                self.content["enemies"] = {}
-                self.content["boss"] = {}
-        except Exception as e:
-            self.update_log(f"Error loading content: {e}")
+            path = os.path.join(os.path.dirname(__file__), "icons", icon_name)
+            r = QSvgRenderer(path); px = QPixmap(40, 40); px.fill(Qt.GlobalColor.transparent)
+            p = QPainter(px); r.render(p); p.end()
+            label.setPixmap(px); label.setToolTip(tooltip)
+        except: pass
+
+    def explore_dungeon(self):
+        """Zahájí nebo pokračuje v průzkumu dungeonu."""
+        if self.settings.value("effects_volume", 50, type=int) > 0: self.sound_manager.play_sound("explore", True)
+        if self.current_room != "dungeon":
+            self.current_room = "dungeon"; self.update_location(); self.update_actions()
+            self.update_log("Vstupuješ do temných stok...")
+        else: self.advance_dungeon()
 
     def advance_dungeon(self):
-        """Advance one step in the dungeon and handle outcome."""
-        # Block if in event or combat state
-        if self.dungeon["state"] in ("event", "combat"):
-            self.update_log("You must resolve your current situation before advancing.")
-            return
-
-        # Warning 3, 2, 1 steps before boss encounter
-        steps_left = self.dungeon["steps_required"] - self.dungeon["progress"]
-        if steps_left in (3, 2, 1):
-            self.update_log("You feel a terrible presence ahead...")
-
-        # If next step reaches boss, start boss combat
-        if steps_left == 1:
-            self.dungeon["state"] = "combat"
+        """Posune postavu v dungeonu a vyhodnotí náhodné setkání."""
+        self.dungeon["progress"] += 1
+        self.update_location()
+        
+        if self.dungeon["progress"] >= self.dungeon["steps_required"]:
             self.start_boss_battle()
             return
-
-        # Roll outcome
-        outcome = self.roll_outcome()
-        if outcome == "nothing":
-            # Random "nothing happens" messages for variety
-            nothing_messages = [
-                "You advance cautiously. Nothing happens.",
-                "You examine ancient dungeon engravings. You can't make anything of them.",
-                "Your footsteps echo in the empty hallway ahead.",
-                "You search thoroughly but come up empty-handed this time.",
-                "The stone walls seem to whisper ancient secrets, but reveal nothing.",
-                "You navigate through a maze of empty chambers.",
-                "Every shadow could hide danger, but this time... nothing stirs.",
-                "You explore a series of abandoned rooms, finding nothing of value.",
-                "Ancient murals line the walls, but no treasures await here.",
-                "The darkness ahead seems to watch you, but nothing emerges."
-            ]
-            message = random.choice(nothing_messages)
-            self.update_log(message)
-            self.dungeon["progress"] += 1
-        elif outcome == "treasure":
-            # Simple treasure scaled by level
-            reward = random.randint(10, 25) + 5 * self.dungeon["level"]
-            self.character["gold"] += reward
-            self.update_log(f"You find a small stash of gold (+{reward}).")
-            self.dungeon["progress"] += 1
-            self.update_stats()
-        elif outcome == "event":
-            self.dungeon["state"] = "event"
-            self.start_event_placeholder()
-            # Resolve immediately for now
-            self.dungeon["state"] = "idle"
-            self.dungeon["progress"] += 1
-        elif outcome == "enemy":
-            # Enter combat; progress increases upon victory
-            self.dungeon["state"] = "combat"
-            self.start_enemy_placeholder()
-
-        # Check completion
-        if self.dungeon["progress"] >= self.dungeon["steps_required"]:
-            self.dungeon["state"] = "completed"
-            self.complete_level()
-
-    def roll_outcome(self):
-        """Weighted random outcome for dungeon advance."""
-        probs = {
-            "nothing": 0.3,
-            "event": 0.3,
-            "enemy": 0.3,
-            "treasure": 0.1
-        }
+        
         r = random.random()
-        cumulative = 0.0
-        for outcome, p in probs.items():
-            cumulative += p
-            if r <= cumulative:
-                return outcome
-        return "nothing"
+        if r < 0.35: # Prázdná cesta
+            self.update_log(random.choice(["Pokračuješ hlouběji.", "Cesta je klidná.", "Slyšíš jen kapání vody."]))
+        elif r < 0.45: # Zlato
+            gold = random.randint(5, 15) + (5 * self.dungeon["level"])
+            self.character["gold"] += gold
+            self.update_log(f"Našel jsi váček zlata (<span style='color: #FFD700;'>+{gold} g</span>)!")
+            self.update_stats()
+        elif r < 0.55: # Událost
+            self.start_event()
+        else: # Boj
+            self.start_combat()
 
-    def start_event_placeholder(self):
-        """Show a simple placeholder for events. Content to be filled via JSON later."""
-        QMessageBox.information(self, "Event", "An event occurs (placeholder). Fill details in data/events.json.")
-
-    def start_enemy_placeholder(self):
-        """Start a simple enemy encounter using loaded content when available."""
+    def start_event(self):
+        """Spustí náhodnou textovou událost."""
         lvl = str(self.dungeon["level"])
-        enemies_for_level = self.content.get("enemies", {}).get(lvl, [])
-        if enemies_for_level:
-            enemy = random.choice(enemies_for_level)
-            self.current_enemy = {
-                "id": enemy.get("id"),
-                "name": enemy.get("name", "Enemy"),
-                "health": int(enemy.get("health", 10)),
-                "attack": int(enemy.get("attack", 3)),
-                "defense": int(enemy.get("defense", 1)),
-                "reward_gold": int(enemy.get("reward_gold", 5)),
-                "reward_exp": int(enemy.get("reward_exp", 3)),
-                "is_boss": False,
-            }
-            self.update_log(f"A {self.current_enemy['name']} appears! Combat started.")
-        else:
-            self.current_enemy = {
-                "id": "placeholder",
-                "name": "Training Dummy",
-                "health": 10,
-                "attack": 0,
-                "defense": 0,
-                "reward_gold": 0,
-                "reward_exp": 0,
-                "is_boss": False,
-            }
-            self.update_log("An enemy appears (placeholder).")
+        evs = self.content["events"].get(lvl, [])
+        if not evs: return
+        dlg = EventDialog(random.choice(evs), self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.selected_choice:
+            eff = dlg.selected_choice.get("effects", {})
+            self.character["gold"] = max(0, self.character.get("gold", 0) + int(eff.get("gold", 0)))
+            self.character["health"] = min(self.character["max_health"], max(0, self.character["health"] + int(eff.get("health", 0))))
+            self.character["potions"] = max(0, self.character["potions"] + int(eff.get("potions", 0)))
+            self.update_stats(); self.update_log(f"Výsledek: {dlg.selected_choice['label']}")
+
+    def start_combat(self):
+        """Inicializuje souboj s běžným nepřítelem."""
+        lvl = str(self.dungeon["level"])
+        enemies = self.content["enemies"].get(lvl, [])
+        if not enemies: return
+        e = random.choice(enemies)
+        self.current_enemy = {
+            "name": e["name"], "health": int(e["health"]), "attack": int(e["attack"]),
+            "defense": int(e["defense"]), "reward_gold": int(e["reward_gold"]),
+            "reward_exp": int(e["reward_exp"]), "is_boss": False
+        }
+        self.update_log(f"Zpoza rohu vyběhl <b>{e['name']}</b>!")
+        if e.get("description"):
+            self.update_log(f"<i>'{e['description']}'</i>")
         self.update_actions()
-        self.update_combat_display()
 
     def start_boss_battle(self):
-        """Start a boss encounter using loaded boss content when available."""
+        """Inicializuje souboj s finálním bossem úrovně."""
         lvl = str(self.dungeon["level"])
-        boss = self.content.get("boss", {}).get(lvl)
-        if boss:
-            self.current_enemy = {
-                "id": boss.get("id", f"boss_{lvl}"),
-                "name": boss.get("name", "Boss"),
-                "health": int(boss.get("health", 30)),
-                "attack": int(boss.get("attack", 6)),
-                "defense": int(boss.get("defense", 2)),
-                "reward_gold": int(boss.get("reward_gold", 25)),
-                "reward_exp": int(boss.get("reward_exp", 20)),
-                "is_boss": True,
-            }
-            self.update_log(f"A powerful foe awaits: {self.current_enemy['name']}! Boss battle begins.")
-        else:
-            # Fallback boss
-            self.current_enemy = {
-                "id": f"boss_{lvl}",
-                "name": "Sewer Abomination",
-                "health": 35,
-                "attack": 7,
-                "defense": 2,
-                "reward_gold": 20,
-                "reward_exp": 18,
-                "is_boss": True,
-            }
-            self.update_log("A powerful presence looms... A boss emerges!")
-
-        # Switch to boss music
-        self.play_boss_music()
+        b = self.content["boss"].get(lvl)
+        if not b: return
+        self.current_enemy = {
+            "name": b["name"], "health": int(b["health"]), "attack": int(b["attack"]),
+            "defense": int(b["defense"]), "reward_gold": int(b["reward_gold"]),
+            "reward_exp": int(b["reward_exp"]), "is_boss": True,
+            "music": b.get("music", "background_boss.wav")
+        }
+        self.update_log(f"<b>POZOR!</b> Před tebou stojí <b>{b['name']}</b>!")
+        if b.get("description"):
+            self.update_log(f"<i>'{b['description']}'</i>")
         self.update_actions()
-        self.update_combat_display()
-
-    def handle_boss_placeholder(self):
-        """Boss encounter placeholder at the final step of the level."""
-        lvl = str(self.dungeon["level"])
-        boss = self.content.get("boss", {}).get(lvl)
-        if boss:
-            self.update_log(f"A powerful foe awaits: {boss.get('name', 'Boss')} (placeholder).")
-        else:
-            self.update_log("A powerful presence looms... Boss battle is coming (placeholder).")
-
-    def complete_level(self):
-        """Handle level completion and move to next level."""
-        self.update_log(f"You find stairs to Level {self.dungeon['level'] + 1}.")
-        # Advance level
-        self.dungeon["level"] += 1
-        self.dungeon["progress"] = 0
-        self.dungeon["state"] = "idle"
-        self.update_location()
+        self.play_background_music()
 
     def return_to_town(self):
-        """Return to town from the dungeon."""
-        if self.current_room == "dungeon":
-            # Reset dungeon state
-            self.dungeon["state"] = "idle"
-            self.dungeon["progress"] = 0
-            self.current_enemy = None
-            
-            # Return to town
-            self.current_room = "town"
-            self.update_location()
-            self.update_actions()
-            
-            # Log the return
-            steps_required = self.dungeon.get("steps_required", 0)
-            self.update_log(f"You return to the safety of town. Dungeon progress reset (0/{steps_required}).")
-            
-            # Play sound effect
-            if hasattr(self, 'sound_manager'):
-                self.sound_manager.play_sound('click')
+        """Ukončí průzkum a vrátí hráče do města. Resetuje úroveň dungeonu."""
+        self.current_room = "town"
+        self.current_enemy = None
+        self.dungeon["level"] = 1      # Reset na Sewers
+        self.dungeon["progress"] = 0   # Reset kroků
+        self.update_location()
+        self.update_actions()
+        self.play_background_music()
     
     def visit_shop(self):
-        """Handle shop visit action with sound"""
-        self.update_log("You visit the shop...")
-        settings = QSettings("DungeonExplorer", "RPGGame")
-        if settings.value("sound_effects", False, type=bool):
-            self.sound_manager.play_sound("click")
-            
-        # Open shop dialog
-        shop_dialog = ShopDialog(self.character, self.sound_manager, self)
-        if shop_dialog.exec() == QDialog.DialogCode.Accepted:
-            # Update character stats display after shopping
-            self.update_stats()
-            
-            # Log purchases
-            if shop_dialog.purchased_items:
-                items_text = ", ".join([item["name"] for item in shop_dialog.purchased_items])
-                self.update_log(f"You purchased: {items_text}")
-            else:
-                self.update_log("You leave the shop without buying anything.")
-            
-            # Restart background music
-            self.play_background_music()
+        """Otevře okno obchodu."""
+        if ShopDialog(self.character, self.sound_manager, self).exec():
+            self._init_attributes(); self.update_stats(); self.play_background_music()
     
     def rest_at_inn(self):
-        """Handle rest at inn action: open Inn dialog for save/heal"""
-        self.update_log("You rest at the inn...")
-        self.current_room = "inn"
-        self.update_location()
-        settings = QSettings("DungeonExplorer", "RPGGame")
-        if settings.value("sound_effects", False, type=bool):
-            self.sound_manager.play_sound("click")
-
-        inn_dialog = InnDialog(self.character, self.sound_manager, self)
-        if inn_dialog.exec() == QDialog.DialogCode.Accepted:
-            # Update stats after potential healing
-            self.update_stats()
-            # Restart normal background music when leaving inn
-            self.current_room = "town"
-            self.update_location()
-            self.play_background_music()
+        """Otevře okno hostince."""
+        if InnDialog(self.character, self.sound_manager, self).exec():
+            self.update_stats(); self.play_background_music()
     
     def attack_enemy(self):
-        """Simple combat: player attacks, enemy counterattacks if alive."""
-        if not self.current_enemy:
-            return
-        settings = QSettings("DungeonExplorer", "RPGGame")
-        if settings.value("sound_effects", False, type=bool):
-            self.sound_manager.play_sound("attack")
+        """Provede jedno kolo souboje (útok hráče a protiútok nepřítele)."""
+        if not self.current_enemy: return
+        if self.settings.value("effects_volume", 50, type=int) > 0: self.sound_manager.play_sound("attack", True)
+        
+        # 1. Útok hráče
+        dmg = max(1, self.character["attack"] - self.current_enemy["defense"])
+        self.current_enemy["health"] -= dmg
+        self.update_log(f"Zasáhl jsi {self.current_enemy['name']} za <span style='color: #22C55E;'>{dmg} poškození</span>.")
 
-        # Player attacks
-        player_damage = max(1, self.character["attack"] - self.current_enemy["defense"])
-        self.current_enemy["health"] -= player_damage
-        self.update_log(f"You hit the {self.current_enemy['name']} for {player_damage} damage.")
-
-        # Victory check
+        # Kontrola vítězství
         if self.current_enemy["health"] <= 0:
-            gold = self.current_enemy.get("reward_gold", 0)
-            exp = self.current_enemy.get("reward_exp", 0)
-            self.character["gold"] += gold
-            self.character["exp"] += exp
-            # Check for level up without stat increases
-            self.check_level_up()
-            self.update_stats()
-            self.update_log(f"You defeated the {self.current_enemy['name']}! +{gold} gold, +{exp} EXP.")
+            self._finish_combat(); return
 
-            # If boss, complete the level and restore normal music
-            if self.current_enemy.get("is_boss"):
-                self.current_enemy = None
-                self.dungeon["state"] = "completed"
-                # Stop boss music and resume normal background
-                self.sound_manager.stop_music()
-                self.play_background_music()
-                self.complete_level()
-                return
-
-            # Regular enemy victory: advance progress
-            self.current_enemy = None
-            self.dungeon["state"] = "idle"
-            self.dungeon["progress"] += 1
-            self.update_actions()
-            return
-
-        # Enemy counterattacks
-        enemy_damage = max(1, self.current_enemy["attack"] - self.character["defense"])
-        self.character["health"] = max(0, self.character["health"] - enemy_damage)
-        self.update_log(f"The {self.current_enemy['name']} hits you for {enemy_damage} damage.")
+        # 2. Protiútok nepřítele
+        e_dmg = max(1, self.current_enemy["attack"] - self.character["defense"])
+        self.character["health"] = max(0, self.character["health"] - e_dmg)
+        self.update_log(f"{self.current_enemy['name']} tě zasáhl za <span style='color: #EF4444;'>{e_dmg} poškození</span>.")
         self.update_stats()
 
-        # Defeat check
+        # Kontrola porážky
         if self.character["health"] <= 0:
-            self.update_log("You are defeated! You wake up back in town.")
-            # Minimal defeat handling
-            self.current_enemy = None
-            self.dungeon["state"] = "idle"
-            self.current_room = "town"
-            self.dungeon["progress"] = 0
-            self.character["health"] = self.character["max_health"] // 2
-            self.update_location()
-            # Stop any boss music and resume normal town music
-            self.sound_manager.stop_music()
-            self.play_background_music()
-            self.update_actions()
-        else:
-            self.update_combat_display()
+            self.update_log("Byl jsi poražen! Vracíš se do města se zraněním."); self.return_to_town()
+        else: self.update_combat_display()
     
+    def _finish_combat(self):
+        """Zpracuje odměny po úspěšném souboji."""
+        e = self.current_enemy
+        g, xp = e["reward_gold"], e["reward_exp"]
+        self.character["gold"] += g; self.character["exp"] += xp
+        self.character["score"] = self.character.get("score", 0) + xp
+        
+        self.update_log(f"Vítězství! Získáno <span style='color: #FFD700;'>{g} g</span> a <span style='color: #A855F7;'>{xp} EXP</span>.")
+        
+        is_boss = e.get('is_boss', False)
+        current_lvl = self.dungeon['level']
+
+        if is_boss:
+            self.update_log(f"<b>Gratulujeme!</b> Úroveň {current_lvl} dokončena.")
+            
+            # Kontrola konce hry po 2. úrovni (Goblin Warrens)
+            if current_lvl == 2:
+                self.update_stats() # Aktualizace skóre před zobrazením konce
+                dlg = EndScreenDialog(self.character.get('score', 0), self)
+                if dlg.exec() == QDialog.DialogCode.Accepted:
+                    # Návrat do města a pokračování
+                    self.return_to_town()
+                    return
+                else:
+                    # Ukončení hry
+                    sys.exit(0)
+
+            self.dungeon['level'] += 1
+            self.dungeon["progress"] = 0 # Reset progress for next level
+        
+        self.check_level_up(); self.update_stats()
+        self.current_enemy = None; self.update_actions()
+        self.play_background_music()
+
     def use_potion(self):
-        """Restore health if a potion is available."""
-        settings = QSettings("DungeonExplorer", "RPGGame")
-        if self.character.get("potions", 0) <= 0:
-            self.update_log("No potions left!")
+        """Vyléčí část zdraví pomocí lektvaru, pokud nějaké zbývají."""
+        potions = self.character.get("potions", 0)
+        if potions <= 0:
+            self.update_log("<span style='color: #ef4444;'>Nemáš žádné lektvary!</span>")
             return
-        heal_amount = max(10, self.character["max_health"] // 4)
+            
+        heal = max(10, self.character["max_health"] // 3)
         self.character["potions"] -= 1
-        self.character["health"] = min(self.character["max_health"], self.character["health"] + heal_amount)
-        self.update_log(f"You use a potion and heal {heal_amount} HP.")
-        if settings.value("sound_effects", False, type=bool):
-            self.sound_manager.play_sound("potion")
+        self.character["health"] = min(self.character["max_health"], self.character["health"] + heal)
+        
+        self.update_log(f"Vypil jsi lektvar a vyléčil <span style='color: #22C55E;'>{heal} HP</span>.")
+        self.update_log(f"Zbývající lektvary: {self.character['potions']}")
+        
+        if self.settings.value("effects_volume", 50, type=int) > 0: 
+            self.sound_manager.play_sound("potion", True)
+            
         self.update_stats()
         self.update_combat_display()
     
     def flee_combat(self):
-        """Attempt to flee: exit combat; progress doesn't change."""
-        settings = QSettings("DungeonExplorer", "RPGGame")
-        self.update_log("You attempt to flee!")
-        if settings.value("sound_effects", False, type=bool):
-            self.sound_manager.play_sound("explore")
-        if self.current_enemy:
-            self.update_log("You successfully flee from combat.")
-            # If fleeing from a boss, restore normal music
-            if self.current_enemy.get("is_boss"):
-                self.sound_manager.stop_music()
-                self.play_background_music()
-        self.current_enemy = None
-        self.dungeon["state"] = "idle"
-        self.update_actions()
-        self.update_combat_display()
+        """Umožní útěk ze souboje za cenu návratu do města."""
+        self.update_log("Úspěšně jsi utekl!"); self.return_to_town()
 
     def update_combat_display(self):
-        """Update combat label with current stats."""
-        if not self.combat_label:
-            return
+        """Aktualizuje textový stav souboje uprostřed obrazovky."""
         if self.current_enemy:
-            self.combat_label.setText(
-                f"⚔️ COMBAT\nEnemy: {self.current_enemy['name']}\n"
-                f"Enemy HP: {self.current_enemy['health']}\n"
-                f"Your HP: {self.character['health']}/{self.character['max_health']}"
-            )
-        else:
-            self.combat_label.setText("Combat")
+            e = self.current_enemy
+            self.combat_label.setText(f"<b>⚔️ SOUBOJ</b><br>Nepřítel: {e['name']}<br>"
+                                     f"Životy: {e['health']} HP<br>"
+                                     f"Tvé HP: {self.character['health']}/{self.character['max_health']}")
+        else: self.combat_label.setText("")
 
-# Main application execution
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    game = RPGGame()
-    game.show()
-    sys.exit(app.exec())
+    app = QApplication(sys.argv); app.setStyleSheet(APP_QSS)
+    game = RPGGame(); game.show(); sys.exit(app.exec())

@@ -33,6 +33,7 @@ class Character(db.Model):
     defense = db.Column(db.Integer, default=5)
     gold = db.Column(db.Integer, default=50)
     potions = db.Column(db.Integer, default=3)
+    score = db.Column(db.Integer, default=0)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 # Routes
@@ -55,6 +56,14 @@ def characters_page():
 @app.route('/highscores', methods=['GET'])
 def highscores_page():
     return render_template('high_scores.html')
+
+@app.route('/manual', methods=['GET'])
+def manual_page():
+    return render_template('manual.html')
+
+@app.route('/diagramy', methods=['GET'])
+def diagramy_page():
+    return render_template('diagramy.html')
 
 # API Routes
 @app.route('/api/register', methods=['POST'])
@@ -113,7 +122,8 @@ def get_characters():
             'max_health': char.max_health,
             'attack': char.attack,
             'defense': char.defense,
-            'potions': char.potions
+            'potions': char.potions,
+            'score': char.score
         })
     
     return jsonify({'success': True, 'characters': characters_data})
@@ -128,7 +138,8 @@ def create_character():
     try:
         character = Character(
             name=data['name'],
-            user_id=data['user_id']
+            user_id=data['user_id'],
+            gold=0  # override default; new characters start with 0 gold
         )
         db.session.add(character)
         db.session.commit()
@@ -152,16 +163,33 @@ def update_character(character_id):
     character.defense = data.get('defense', character.defense)
     character.gold = data.get('gold', character.gold)
     character.potions = data.get('potions', character.potions)
+    character.score = data.get('score', character.score)
     
     db.session.commit()
     return jsonify({'success': True})
 
+@app.route('/api/characters/<int:character_id>', methods=['DELETE'])
+def delete_character(character_id):
+    character = Character.query.get_or_404(character_id)
+    # Optional ownership check — expect user_id in body or query
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id') or request.args.get('user_id')
+    if user_id is not None and str(character.user_id) != str(user_id):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    try:
+        db.session.delete(character)
+        db.session.commit()
+        return jsonify({'success': True})
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'Database error occurred'}), 500
+
 @app.route('/api/highscores', methods=['GET'])
 def get_highscores():
-    # Get top 10 characters by level, then gold
+    # Get top 10 characters by score, then level
     characters = Character.query.order_by(
-        Character.level.desc(), 
-        Character.gold.desc()
+        Character.score.desc(),
+        Character.level.desc()
     ).limit(10).all()
     
     highscores = []
@@ -171,7 +199,8 @@ def get_highscores():
             'character_name': char.name,
             'username': user.username,
             'level': char.level,
-            'gold': char.gold
+            'gold': char.gold,
+            'score': char.score
         })
     
     return jsonify({'success': True, 'highscores': highscores})

@@ -1,12 +1,13 @@
 {
   "schema_version": 1,
-  "description": "Enemies grouped by dungeon level. Fill stats per enemy.",
+  "description": "Nepřátelé seskupení podle úrovně dungeonu.",
   "levels": {
     "1": [
       {
         "id": "sewers-en-1",
-        "name": "Giant rat",
+        "name": "Obří krysa",
         "type": "normal",
+        "description": "Chorobami prolezlý hlodavec s planoucíma očima a vyceněnými zuby. Pozor na jeho kousnutí!",
         "health": 10,
         "attack": 3,
         "defense": 1,
@@ -14,9 +15,10 @@
         "reward_exp": 3
       },
       {
-	"id": "sewers-en-2",
-        "name": "Sewer slime",
+        "id": "sewers-en-2",
+        "name": "Stokový sliz",
         "type": "normal",
+        "description": "Rosolovitá hmota, která rozkládá zbytky i neopatrné poutníky. Raději do něj nešlapej.",
         "health": 12,
         "attack": 5,
         "defense": 2,
@@ -24,9 +26,10 @@
         "reward_exp": 4
       },
       {
-	"id": "sewers-en-3",
-        "name": "Toxic snail",
+        "id": "sewers-en-3",
+        "name": "Toxický šnek",
         "type": "normal",
+        "description": "Pomalé stvoření zanechávající za sebou žíravý jed na vlhkých kamenech. Vydrží i silné rány.",
         "health": 14,
         "attack": 1,
         "defense": 5,
@@ -34,9 +37,10 @@
         "reward_exp": 5
       },
       {
-	"id": "sewers-en-4",
-        "name": "Drowned",
+        "id": "sewers-en-4",
+        "name": "Utopenec",
         "type": "normal",
+        "description": "Promáčená mrtvola oživená temnou magií a lítostí. Kdysi to býval statečný válečník, kterého jsi možná znal.",
         "health": 20,
         "attack": 8,
         "defense": 3,
@@ -44,16 +48,98 @@
         "reward_exp": 10
       }
     ],
+    "2": [
+      {
+        "id": "goblin",
+        "name": "Goblin",
+        "type": "normal",
+        "description": "Lstivý obyvatel jeskyní, kterému se daří v tlupách a stínech. Hlídej si kapsy!",
+        "health": 120,
+        "attack": 15,
+        "defense": 5,
+        "reward_gold": 20,
+        "reward_exp": 18
+      },
+      {
+        "id": "goblin_warrior",
+        "name": "Gobliní válečník",
+        "type": "normal",
+        "description": "Zkušený nájezdník v nalezeném brnění se zlomyslným úšklebkem. Bojoval i s horšími soupeři, než jsi ty.",
+        "health": 200,
+        "attack": 25,
+        "defense": 20,
+        "reward_gold": 30,
+        "reward_exp": 25
+      },
+      {
+        "id": "goblin_witch",
+        "name": "Gobliní čarodějnice",
+        "type": "normal",
+        "description": "Ježibaba z doupěte, která do bitvy vplétá kouř a kletby. Dej si pozor na její zaříkávadla!",
+        "health": 100,
+        "attack": 40,
+        "defense": 4,
+        "reward_gold": 24,
+        "reward_exp": 22
+      },
+      {
+        "id": "goblin_general",
+        "name": "Gobliní generál",
+        "type": "normal",
+        "description": "Bezohledný velitel, jehož jizvy vyprávějí o nesčetných bitvách. Jeho obouruční válečná sekera rozsekala mnoho mužů.",
+        "health": 300,
+        "attack": 39,
+        "defense": 23,
+        "reward_gold": 60,
+        "reward_exp": 40
+      },
+      {
+        "id": "goblin_assassin",
+        "name": "Gobliní zabiják",
+        "type": "normal",
+        "description": "Tichý vrah s otrávenými čepelemi a zálibou v přepadech ze zálohy. Nikdy nebojuje čestně.",
+        "health": 220,
+        "attack": 50,
+        "defense": 13,
+        "reward_gold": 45,
+        "reward_exp": 30
+      },
+      {
+        "id": "mutant",
+        "name": "Mutant",
+        "type": "normal",
+        "description": "Pokřivený hrubián zrozený ze špatné alchymie a ještě horšího štěstí. Musí zemřít.",
+        "health": 500,
+        "attack": 45,
+        "defense": 0,
+        "reward_gold": 43,
+        "reward_exp": 31
+      }
+    ],
     "boss": {
       "1": {
         "id": "sewers-boss",
-        "name": "Rat king",
+        "name": "Krysí král",
         "type": "boss",
+        "description": "Koruna ze špíny a trůn z kostí — pán stok. Jeho krysí bratři se tě pokusí přemoci čísly.",
+        "music": "boss_rKing.wav",
         "health": 120,
         "attack": 14,
         "defense": 6,
         "reward_gold": 50,
         "reward_exp": 40
+      },
+      "2": {
+        "id": "boss_2",
+        "name": "Gathar Zrádce",
+        "type": "boss",
+        "description": "Kdysi hrdý orkský poručík, nyní tyran vedoucí gobliní armádu do boje proti svým vlastním orkským vůdcům. Ohání se obřím mečem a nosí zbroj z dračí kůže.",
+        "music": "boss_gathar.wav",
+        "health": 900,
+        "attack": 80,
+        "defense": 20,
+        "reward_gold": 1200,
+        "reward_exp": 300
       }
     }
   }

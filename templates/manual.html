@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pcherské Legendy - Manuál</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <nav class="top-bar">
+        <div class="nav-container">
+            <a href="/" class="nav-link">Přihlášení</a>
+            <a href="/register" class="nav-link">Registrace</a>
+            <a href="/characters" class="nav-link">Postavy</a>
+            <a href="/highscores" class="nav-link">Žebříček</a>
+            <a href="/manual" class="nav-link active">Manuál</a>
+            <a href="/diagramy" class="nav-link">Diagramy</a>
+        </div>
+    </nav>
+
+    <div class="container manual-container">
+        <h1>Jak hrát Pcherské Legendy</h1>
+        
+        <section class="manual-section">
+            <h2>O čem je tato hra?</h2>
+            <p>Pcherské Legendy je RPG hra, kde se vžijete do role hrdiny prozkoumávajícího nebezpečný svět. Vaším cílem je vylepšovat svou postavu, bojovat s nepřáteli, sbírat zlato a stát se největší legendou Pcher.</p>
+        </section>
+
+        <section class="manual-section">
+            <h2>Základní mechaniky</h2>
+            <ul>
+                <li><strong>Postavy:</strong> Můžete mít více postav. Každá postava má své vlastní úrovně (level), zkušenosti (EXP), životy (HP) a statistiky (útok, obrana).</li>
+                <li><strong>Průzkum:</strong> Při prozkoumávání světa můžete narazit na nepřátele nebo různé události.</li>
+                <li><strong>Souboj:</strong> Boj probíhá na tahy. Můžete útočit nebo se léčit pomocí lektvarů.</li>
+                <li><strong>Lektvary:</strong> Obnovují vaše životy během souboje i mimo něj.</li>
+                <li><strong>Zkušenosti a Úrovně:</strong> Za porážku nepřátel získáváte EXP. Po nasbírání dostatečného množství postoupíte na další úroveň, což zvýší vaše statistiky.</li>
+            </ul>
+        </section>
+
+        <section class="manual-section">
+            <h2>Jak začít?</h2>
+            <ol>
+                <li>Zaregistrujte se a přihlaste se.</li>
+                <li>Vytvořte si svou první postavu.</li>
+                <li>Vyberte postavu a vydejte se na dobrodružství!</li>
+            </ol>
+        </section>
+        
+        <section class="manual-section">
+            <h2>Ovládání</h2>
+            <p>Hra zatím podporuje jenom ovládání myší.</p>
+        </section>
+
+        <div class="links">
+            <a href="/">Zpět na přihlášení</a>
+        </div>
+    </div>
+</body>
+</html>

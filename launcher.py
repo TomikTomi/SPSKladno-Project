@@ -3,9 +3,10 @@ import time
 import sys
 import os
 import requests
+import webbrowser
 
 def start_flask():
-    """Start Flask server in a subprocess"""
+    """Start Flask server in a subprocess"""    
     # Use DETACHED_PROCESS flag to hide the console window
     flask_process = subprocess.Popen([
         sys.executable, "app.py"
@@ -41,6 +42,15 @@ if __name__ == "__main__":
     
     print("Waiting for server to start...")
     if check_server_ready():
+        # Surface the local URL for quick access
+        url = 'http://127.0.0.1:5000/'
+        print(f"Server ready at {url}. Opening in browser...")
+        try:
+            webbrowser.open(url)
+        except Exception:
+            # If browser open fails, still continue
+            print(f"Open this URL manually: {url}")
+
         print("Starting game client...")    
         client_proc = start_client()
         

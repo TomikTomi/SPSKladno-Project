@@ -2,28 +2,41 @@
 <html>
 <head>
     <title>Pcherské Legendy - Postavy</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
-        body { font-family: Arial; max-width: 600px; margin: 20px auto; padding: 20px; }
-        .character-card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
-        .character-stats { color: #666; font-size: 14px; }
-        button { padding: 8px 15px; margin: 5px; }
-        .new-character { margin: 20px 0; }
-        input { padding: 8px; margin: 5px; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal .box { background: #1b2138; color: #fff; padding: 20px; border-radius: 8px; width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        .modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+        .modal button { padding: 8px 12px; }
     </style>
 </head>
 <body>
-    <h2>Postavy</h2>
-    <div id="charactersList"></div>
-    
-    <div class="new-character">
-        <h3>Vytvořit Novou Postavu</h3>
-        <input type="text" id="characterName" placeholder="Jméno Postavy">
-        <button onclick="createCharacter()">Vytvořit Postavu</button>
-    </div>
-    
-    <div style="margin-top: 20px;">
-        <a href="/highscores">Zobrazit Skóre</a> | 
-        <a href="/login" onclick="logout()">Odhlásit Se</a>
+    <nav class="top-bar">
+        <div class="nav-container">
+            <a href="/" class="nav-link">Přihlášení</a>
+            <a href="/register" class="nav-link">Registrace</a>
+            <a href="/characters" class="nav-link active">Postavy</a>
+            <a href="/highscores" class="nav-link">Žebříček</a>
+            <a href="/manual" class="nav-link">Manuál</a>
+            <a href="/diagramy" class="nav-link">Diagramy</a>
+        </div>
+    </nav>
+    <div class="container">
+        <h2>Postavy</h2>
+        <div id="charactersList"></div>
+        
+        <div class="new-character" style="margin:20px 0;">
+            <h3>Vytvořit Novou Postavu</h3>
+            <div class="input-row">
+                <input type="text" id="characterName" placeholder="Jméno Postavy">
+            </div>
+            <button class="button-primary" onclick="createCharacter()">Vytvořit Postavu</button>
+        </div>
+        
+        <div class="links" style="margin-top: 20px;">
+            <a href="/highscores">Zobrazit Skóre</a> | 
+            <a href="/login" onclick="logout()">Odhlásit Se</a>
+        </div>
     </div>
 
     <script>
@@ -50,15 +63,17 @@
             
             data.characters.forEach(character => {
                 const card = document.createElement('div');
-                card.className = 'character-card';
+                card.className = 'card';
                 card.innerHTML = `
                     <h3>${character.name}</h3>
-                    <div class="character-stats">
+                    <div class="stats">
                         Level: ${character.level} | Gold: ${character.gold} | 
                         Attack: ${character.attack} | Defense: ${character.defense}
                     </div>
-                    <button onclick="playGame(${character.id})">Play Game</button>
-                    <button onclick="deleteCharacter(${character.id})">Delete</button>
+                    <div class="actions">
+                        <button class="button-primary" onclick="playGame(${character.id})">Hrát</button>
+                        <button onclick="confirmDelete(${character.id})">Smazat</button>
+                    </div>
                 `;
                 charactersList.appendChild(card);
             });
@@ -88,12 +103,55 @@
             localStorage.setItem('current_character_id', characterId);
             alert('Launch the PyQt6 game client to play with this character!');
         }
-        
+
         function logout() {
             localStorage.clear();
+        }
+
+        let pendingDeleteId = null;
+        function confirmDelete(characterId) {
+            pendingDeleteId = characterId;
+            document.getElementById('confirmDeleteModal').style.display = 'flex';
+        }
+
+        function closeConfirm() {
+            pendingDeleteId = null;
+            document.getElementById('confirmDeleteModal').style.display = 'none';
+        }
+
+        async function performDelete() {
+            const characterId = pendingDeleteId;
+            if (!characterId) { closeConfirm(); return; }
+            try {
+                const response = await fetch(`/api/characters/${characterId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: parseInt(userId) })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    closeConfirm();
+                    loadCharacters();
+                } else {
+                    closeConfirm();
+                    alert(data.error || 'Smazání se nezdařilo.');
+                }
+            } catch (e) {
+                closeConfirm();
+                alert('Chyba při mazání postavy.');
+            }
         }
         
         loadCharacters();
     </script>
+    <div id="confirmDeleteModal" class="modal">
+        <div class="box">
+            <div>Opravdu smazat tuto postavu?</div>
+            <div class="actions">
+                <button class="button-primary" onclick="performDelete()">Ano</button>
+                <button onclick="closeConfirm()">Ne</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
